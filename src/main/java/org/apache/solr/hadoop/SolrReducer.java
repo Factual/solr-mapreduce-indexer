@@ -16,6 +16,7 @@
  */
 package org.apache.solr.hadoop;
 
+import org.apache.solr.hadoop.util.HeartBeater;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.Iterator;
@@ -76,12 +77,13 @@ public class SolrReducer extends Reducer<Text, SolrInputDocumentWritable, Text, 
     this.heartBeater = new HeartBeater(context);
   }
   
+  @Override
   protected void reduce(Text key, Iterable<SolrInputDocumentWritable> values, Context context) throws IOException, InterruptedException {
     heartBeater.needHeartBeat();
     try {
       values = resolve(key, values, context);
       super.reduce(key, values, context);
-    } catch (Exception e) {
+    } catch (IOException | InterruptedException e) {
       LOG.error("Unable to process key " + key, e);
       context.getCounter(getClass().getName() + ".errors", e.getClass().getName()).increment(1);
       exceptionHandler.handleException(e, null);
@@ -96,12 +98,7 @@ public class SolrReducer extends Reducer<Text, SolrInputDocumentWritable, Text, 
     if (resolver instanceof NoChangeUpdateConflictResolver) {
       return values; // fast path
     }
-    return new Iterable<SolrInputDocumentWritable>() {
-      @Override
-      public Iterator<SolrInputDocumentWritable> iterator() {
-        return new WrapIterator(resolver.orderUpdates(key, new UnwrapIterator(values.iterator()), context));
-      }
-    };
+    return () -> new WrapIterator(resolver.orderUpdates(key, new UnwrapIterator(values.iterator()), context));
   }
     
   @Override
@@ -134,7 +131,7 @@ public class SolrReducer extends Reducer<Text, SolrInputDocumentWritable, Text, 
   ///////////////////////////////////////////////////////////////////////////////
   private static final class WrapIterator implements Iterator<SolrInputDocumentWritable> {
     
-    private Iterator<SolrInputDocument> parent;
+    private final Iterator<SolrInputDocument> parent;
 
     private WrapIterator(Iterator<SolrInputDocument> parent) {
       this.parent = parent;
@@ -163,7 +160,7 @@ public class SolrReducer extends Reducer<Text, SolrInputDocumentWritable, Text, 
   ///////////////////////////////////////////////////////////////////////////////
   private static final class UnwrapIterator implements Iterator<SolrInputDocument> {
     
-    private Iterator<SolrInputDocumentWritable> parent;
+    private final Iterator<SolrInputDocumentWritable> parent;
 
     private UnwrapIterator(Iterator<SolrInputDocumentWritable> parent) {
       this.parent = parent;

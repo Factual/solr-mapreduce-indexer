@@ -16,6 +16,8 @@
  */
 package org.apache.solr.hadoop;
 
+import org.apache.solr.hadoop.util.Utils;
+
 public enum SolrCounters {
 
   DOCUMENTS_WRITTEN (getClassName(SolrReducer.class) 

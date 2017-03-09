@@ -19,7 +19,7 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
-package org.apache.solr.hadoop;
+package org.apache.solr.hadoop.util;
 
 import java.util.Comparator;
 
@@ -36,11 +36,12 @@ import java.util.Comparator;
  * objects.
  * 
  */
-final class AlphaNumericComparator implements Comparator {
+public final class AlphaNumericComparator implements Comparator {
 
     public AlphaNumericComparator() {
     }
 
+    @Override
     public int compare(Object o1, Object o2) {
         String s1 = o1.toString();
         String s2 = o2.toString();

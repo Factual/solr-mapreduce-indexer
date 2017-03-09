@@ -16,6 +16,7 @@
  */
 package org.apache.solr.hadoop;
 
+import org.apache.solr.hadoop.util.Utils;
 import java.io.IOException;
 
 import org.apache.hadoop.fs.Path;

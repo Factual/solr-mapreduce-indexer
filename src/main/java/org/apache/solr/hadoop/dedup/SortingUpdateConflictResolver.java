@@ -27,7 +27,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Reducer.Context;
 import org.apache.solr.common.SolrInputDocument;
-import org.apache.solr.hadoop.HdfsFileFieldNames;
+import org.apache.solr.hadoop.util.HdfsFileFieldNames;
 
 /**
  * UpdateConflictResolver implementation that orders colliding updates ascending

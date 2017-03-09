@@ -37,7 +37,7 @@ import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.request.CoreAdminRequest;
 import org.apache.solr.common.util.ExecutorUtil;
-import org.apache.solr.hadoop.MapReduceIndexerTool.Options;
+import org.apache.solr.hadoop.MapReduceIndexerToolArgumentParser.Options;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,7 +57,7 @@ class GoLive {
     int concurrentMerges = options.goLiveThreads;
     ThreadPoolExecutor executor = new ExecutorUtil.MDCAwareThreadPoolExecutor(concurrentMerges,
         concurrentMerges, 1, TimeUnit.SECONDS,
-        new LinkedBlockingQueue<Runnable>());
+        new LinkedBlockingQueue<>());
     
     try {
       CompletionService<Request> completionService = new ExecutorCompletionService<>(executor);
@@ -153,7 +153,7 @@ class GoLive {
           }
         }
         LOG.info("Done committing live merge");
-      } catch (Exception e) {
+      } catch (IOException | SolrServerException e) {
         LOG.error("Error sending commits to live Solr cluster", e);
         return false;
       }

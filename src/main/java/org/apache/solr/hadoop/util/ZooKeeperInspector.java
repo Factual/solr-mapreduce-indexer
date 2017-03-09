@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.solr.hadoop;
+package org.apache.solr.hadoop.util;
 
 import java.io.File;
 import java.io.IOException;
@@ -47,7 +47,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Extracts SolrCloud information from ZooKeeper.
  */
-final class ZooKeeperInspector {
+public final class ZooKeeperInspector {
   
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   
@@ -83,7 +83,7 @@ final class ZooKeeperInspector {
         // first check for alias
         collection = checkForAlias(zkClient, collection);
         zkStateReader.createClusterStateWatchersAndUpdate();
-      } catch (Exception e) {
+      } catch (KeeperException | InterruptedException e) {
         throw new IllegalArgumentException("Cannot find expected information for SolrCloud in ZooKeeper: " + zkHost, e);
       }
       

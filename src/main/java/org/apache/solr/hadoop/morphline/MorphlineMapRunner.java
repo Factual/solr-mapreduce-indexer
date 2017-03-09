@@ -25,15 +25,14 @@ import java.lang.invoke.MethodHandles;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.mapreduce.Mapper.Context;
 import org.apache.solr.client.solrj.SolrServerException;
-import org.apache.solr.hadoop.HdfsFileFieldNames;
+import org.apache.solr.hadoop.util.HdfsFileFieldNames;
 import org.apache.solr.hadoop.PathParts;
-import org.apache.solr.hadoop.Utils;
+import org.apache.solr.hadoop.util.Utils;
 import org.apache.solr.morphlines.solr.DocumentLoader;
 import org.apache.solr.morphlines.solr.SolrLocator;
 import org.apache.solr.morphlines.solr.SolrMorphlineContext;
@@ -53,6 +52,7 @@ import org.kitesdk.morphline.base.Notifications;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
 import com.google.common.annotations.Beta;
+import com.google.common.base.Joiner;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 
@@ -109,8 +109,7 @@ public final class MorphlineMapRunner {
       for (Map.Entry<String,String> entry : configuration) {
         map.put(entry.getKey(), entry.getValue());
       }
-      LOG.trace("Configuration:\n" +
-          map.entrySet().stream().map(Object::toString).collect(Collectors.joining("\n")));
+      LOG.trace("Configuration:\n{}", Joiner.on("\n").join(map.entrySet()));
     }
     
     FaultTolerance faultTolerance = new FaultTolerance(

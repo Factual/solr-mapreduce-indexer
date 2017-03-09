@@ -16,6 +16,7 @@
  */
 package org.apache.solr.hadoop;
 
+import org.apache.solr.hadoop.util.ZooKeeperInspector;
 import java.lang.invoke.MethodHandles;
 import java.util.Collections;
 import java.util.HashMap;

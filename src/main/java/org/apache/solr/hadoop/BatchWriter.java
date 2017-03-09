@@ -86,6 +86,7 @@ class BatchWriter {
       documents = new ArrayList<>(batch);
     }
 
+    @Override
     public void run() {
       try {
         executingBatches.getAndIncrement();
@@ -141,7 +142,7 @@ class BatchWriter {
         SolrRecordWriter.incrementCounter(taskId, SolrCounters.class.getName(), SolrCounters.BATCH_WRITE_TIME.toString(), result.getElapsedTime());
       }
       return result;
-    } catch (Throwable e) {
+    } catch (SolrServerException | IOException e) {
       if (e instanceof Exception) {
         setBatchWriteException((Exception) e);
       } else {
@@ -164,7 +165,7 @@ class BatchWriter {
     // we need to obtain the settings before the constructor
     if (writerThreads != 0) {
       batchPool = new ExecutorUtil.MDCAwareThreadPoolExecutor(writerThreads, writerThreads, 5,
-          TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>(queueSize),
+          TimeUnit.SECONDS, new LinkedBlockingQueue<>(queueSize),
           new ThreadPoolExecutor.CallerRunsPolicy());
     } else { // single threaded case
       batchPool = null;

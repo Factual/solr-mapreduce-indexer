@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.solr.hadoop;
+package org.apache.solr.hadoop.util;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -36,7 +36,7 @@ import org.apache.hadoop.util.ToolRunner;
  * Nicely formats the output of
  * {@link ToolRunner#printGenericCommandUsage(PrintStream)} with the same look and feel that argparse4j uses for help text.
  */
-class ToolRunnerHelpFormatter {
+public class ToolRunnerHelpFormatter {
   
   public static String getGenericCommandUsage() {
     ByteArrayOutputStream bout = new ByteArrayOutputStream();

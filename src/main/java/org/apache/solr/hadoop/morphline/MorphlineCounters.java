@@ -16,7 +16,7 @@
  */
 package org.apache.solr.hadoop.morphline;
 
-import org.apache.solr.hadoop.Utils;
+import org.apache.solr.hadoop.util.Utils;
 
 public enum MorphlineCounters {
 

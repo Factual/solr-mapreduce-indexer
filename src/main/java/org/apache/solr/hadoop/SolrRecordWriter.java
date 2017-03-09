@@ -16,6 +16,7 @@
  */
 package org.apache.solr.hadoop;
 
+import org.apache.solr.hadoop.util.HeartBeater;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.nio.file.Paths;
@@ -51,14 +52,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
-  
+
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
+  public static final String DEFAULT_CORE_NAME = "core1";
+
   public final static List<String> allowedConfigDirectories = new ArrayList<>(
-      Arrays.asList(new String[] { "conf", "lib", "solr.xml", "core1" }));
+          Arrays.asList(new String[]{"conf", "lib", "solr.xml", DEFAULT_CORE_NAME}));
 
   public final static Set<String> requiredConfigDirectories = new HashSet<>();
-  
+
   static {
     requiredConfigDirectories.add("conf");
   }
@@ -66,7 +69,7 @@ class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
   /**
    * Return the list of directories names that may be included in the
    * configuration data passed to the tasks.
-   * 
+   *
    * @return an UnmodifiableList of directory names
    */
   public static List<String> getAllowedConfigDirectories() {
@@ -76,7 +79,7 @@ class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
   /**
    * check if the passed in directory is required to be present in the
    * configuration data set.
-   * 
+   *
    * @param directory The directory to check
    * @return true if the directory is required.
    */
@@ -84,17 +87,18 @@ class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
     return requiredConfigDirectories.contains(directory);
   }
 
-  /** The path that the final index will be written to */
-
-  /** The location in a local temporary directory that the index is built in. */
-
+  /**
+   * The path that the final index will be written to
+   */
+  /**
+   * The location in a local temporary directory that the index is built in.
+   */
 //  /**
 //   * If true, create a zip file of the completed index in the final storage
 //   * location A .zip will be appended to the final output name if it is not
 //   * already present.
 //   */
 //  private boolean outputZipFile = false;
-
   private final HeartBeater heartBeater;
   private final BatchWriter batchWriter;
   private final List<SolrInputDocument> batch;
@@ -102,16 +106,15 @@ class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
   private long numDocsWritten = 0;
   private long nextLogTime = System.nanoTime();
 
-  private static HashMap<TaskID, Reducer<?,?,?,?>.Context> contextMap = new HashMap<>();
-  
-  public SolrRecordWriter(TaskAttemptContext context, Path outputShardDir, int batchSize) {
+  private static final HashMap<TaskID, Reducer<?, ?, ?, ?>.Context> contextMap = new HashMap<>();
+
+  public SolrRecordWriter(TaskAttemptContext context, Path outputShardDir, int batchSize) throws IOException {
     this.batchSize = batchSize;
     this.batch = new ArrayList<>(batchSize);
     Configuration conf = context.getConfiguration();
 
     // setLogLevel("org.apache.solr.core", "WARN");
     // setLogLevel("org.apache.solr.update", "WARN");
-
     heartBeater = new HeartBeater(context);
     try {
       heartBeater.needHeartBeat();
@@ -120,21 +123,17 @@ class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
       FileSystem fs = outputShardDir.getFileSystem(conf);
       EmbeddedSolrServer solr = createEmbeddedSolrServer(solrHomeDir, fs, outputShardDir);
       batchWriter = new BatchWriter(solr, batchSize,
-          context.getTaskAttemptID().getTaskID(),
-          SolrOutputFormat.getSolrWriterThreadCount(conf),
-          SolrOutputFormat.getSolrWriterQueueSize(conf));
+              context.getTaskAttemptID().getTaskID(),
+              SolrOutputFormat.getSolrWriterThreadCount(conf),
+              SolrOutputFormat.getSolrWriterQueueSize(conf));
 
-    } catch (Exception e) {
-      throw new IllegalStateException(String.format(Locale.ENGLISH,
-          "Failed to initialize record writer for %s, %s", context.getJobName(), conf
-              .get("mapred.task.id")), e);
     } finally {
       heartBeater.cancelHeartBeat();
     }
   }
 
   public static EmbeddedSolrServer createEmbeddedSolrServer(Path solrHomeDir, FileSystem fs, Path outputShardDir)
-      throws IOException {
+          throws IOException {
 
     LOG.info("Creating embedded Solr server with solrHomeDir: " + solrHomeDir + ", fs: " + fs + ", outputShardDir: " + outputShardDir);
 
@@ -145,48 +144,49 @@ class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
     SolrResourceLoader loader = new SolrResourceLoader(Paths.get(solrHomeDir.toString()), null, null);
 
     LOG.info(String
-        .format(Locale.ENGLISH, 
-            "Constructed instance information solr.home %s (%s), instance dir %s, conf dir %s, writing index to solr.data.dir %s, with permdir %s",
-            solrHomeDir, solrHomeDir.toUri(), loader.getInstancePath(),
-            loader.getConfigDir(), dataDirStr, outputShardDir));
+            .format(Locale.ENGLISH,
+                    "Constructed instance information solr.home %s (%s), instance dir %s, conf dir %s, writing index to solr.data.dir %s, with permdir %s",
+                    solrHomeDir, solrHomeDir.toUri(), loader.getInstancePath(),
+                    loader.getConfigDir(), dataDirStr, outputShardDir));
 
     // TODO: This is fragile and should be well documented
-    System.setProperty("solr.directoryFactory", HdfsDirectoryFactory.class.getName()); 
+    System.setProperty("solr.directoryFactory", HdfsDirectoryFactory.class.getName());
     System.setProperty("solr.lock.type", DirectoryFactory.LOCK_TYPE_HDFS);
     System.setProperty("solr.hdfs.nrtcachingdirectory", "false");
     System.setProperty("solr.hdfs.blockcache.enabled", "false");
     System.setProperty("solr.autoCommit.maxTime", "600000");
     System.setProperty("solr.autoSoftCommit.maxTime", "-1");
-    
+
     CoreContainer container = new CoreContainer(loader);
     container.load();
-    SolrCore core = container.create("", ImmutableMap.of(CoreDescriptor.CORE_DATADIR, dataDirStr));
-    
+    SolrCore core;
+    core = container.create(DEFAULT_CORE_NAME, ImmutableMap.of(CoreDescriptor.CORE_DATADIR, dataDirStr));
+
     if (!(core.getDirectoryFactory() instanceof HdfsDirectoryFactory)) {
       throw new UnsupportedOperationException(
-          "Invalid configuration. Currently, the only DirectoryFactory supported is "
+              "Invalid configuration. Currently, the only DirectoryFactory supported is "
               + HdfsDirectoryFactory.class.getSimpleName());
     }
 
-    EmbeddedSolrServer solr = new EmbeddedSolrServer(container, "");
+    EmbeddedSolrServer solr = new EmbeddedSolrServer(container, DEFAULT_CORE_NAME);
     return solr;
   }
 
   public static void incrementCounter(TaskID taskId, String groupName, String counterName, long incr) {
-    Reducer<?,?,?,?>.Context context = contextMap.get(taskId);
+    Reducer<?, ?, ?, ?>.Context context = contextMap.get(taskId);
     if (context != null) {
       context.getCounter(groupName, counterName).increment(incr);
     }
   }
 
   public static void incrementCounter(TaskID taskId, Enum<?> counterName, long incr) {
-    Reducer<?,?,?,?>.Context context = contextMap.get(taskId);
+    Reducer<?, ?, ?, ?>.Context context = contextMap.get(taskId);
     if (context != null) {
       context.getCounter(counterName).increment(incr);
     }
   }
 
-  public static void addReducerContext(Reducer<?,?,?,?>.Context context) {
+  public static void addReducerContext(Reducer<?, ?, ?, ?>.Context context) {
     TaskID taskID = context.getTaskAttemptID().getTaskID();
     contextMap.put(taskID, context);
   }
@@ -202,7 +202,7 @@ class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
       }
     }
     throw new IOException(String.format(Locale.ENGLISH,
-        "No local cache archives, where is %s:%s", SolrOutputFormat
+            "No local cache archives, where is %s:%s", SolrOutputFormat
             .getSetupOk(), SolrOutputFormat.getZipName(conf)));
   }
 
@@ -219,6 +219,7 @@ class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
     try {
       try {
         SolrInputDocumentWritable sidw = (SolrInputDocumentWritable) value;
+
         batch.add(sidw.getSolrInputDocument());
         if (batch.size() >= batchSize) {
           batchWriter.queueBatch(batch);
@@ -259,7 +260,7 @@ class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
 //        context.setStatus("Copying Index");
 //        fs.completeLocalOutput(perm, temp); // copy to dfs
 //      }
-    } catch (Exception e) {
+    } catch (IOException | SolrServerException | InterruptedException e) {
       if (e instanceof IOException) {
         throw (IOException) e;
       }
@@ -267,6 +268,7 @@ class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
     } finally {
       heartBeater.cancelHeartBeat();
       heartBeater.close();
+      
 //      File tempFile = new File(temp.toString());
 //      if (tempFile.exists()) {
 //        FileUtils.forceDelete(new File(temp.toString()));
@@ -475,5 +477,5 @@ class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
       log.setLevel(java.util.logging.Level.parse(level));
     }
   }
-  */
+   */
 }
