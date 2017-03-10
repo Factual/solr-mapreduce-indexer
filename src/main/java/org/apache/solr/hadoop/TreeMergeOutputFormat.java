@@ -29,7 +29,6 @@ import java.util.List;
 
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
-import org.apache.directory.api.util.exception.Exceptions;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
@@ -75,7 +74,7 @@ public class TreeMergeOutputFormat extends FileOutputFormat<Text, NullWritable> 
     private final TaskAttemptContext context;
     private boolean closeCalledOnce;
 
-    private static final Logger LOG = log;
+    private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
     public TreeMergeRecordWriter(TaskAttemptContext context, Path workDir) {
       this.workDir = new Path(workDir, "data/index");
@@ -97,31 +96,25 @@ public class TreeMergeOutputFormat extends FileOutputFormat<Text, NullWritable> 
 
     @Override
     public void close(TaskAttemptContext context) throws IOException {
-
-      if (closeCalledOnce==true){
-         LOG.warn("Close already called, ignoring");
-         return;
-      }
-      else
-      {
+      if (closeCalledOnce == true) {
+        throw new IOException("Oh noes!  Closed called again.");
+      } else {
         closeCalledOnce = true;
       }
-      
+
       LOG.debug("Task " + context.getTaskAttemptID() + " merging into dstDir: " + workDir + ", srcDirs: " + shards);
+      
       writeShardNumberFile(context);
+      
       heartBeater.needHeartBeat();
       try {
-        
-        Directory mergedIndex = new HdfsDirectory(workDir, context.getConfiguration());
-        
-        //Directory mergedIndex = new HdfsDirectory(workDir, NoLockFactory.INSTANCE, context.getConfiguration(),1000);
-        
 
-        // TODO: shouldn't we pull the Version from the solrconfig.xml?
+        Directory mergedIndex = new HdfsDirectory(workDir, context.getConfiguration());
+
         IndexWriterConfig writerConfig = new IndexWriterConfig()
                 .setOpenMode(OpenMode.CREATE)
                 .setUseCompoundFile(false)
-                .setRAMBufferSizeMB(100);
+                .setRAMBufferSizeMB(256);
 
         MergePolicy mergePolicy = writerConfig.getMergePolicy();
 
@@ -129,10 +122,10 @@ public class TreeMergeOutputFormat extends FileOutputFormat<Text, NullWritable> 
 
         if (mergePolicy instanceof TieredMergePolicy) {
           ((TieredMergePolicy) mergePolicy).setNoCFSRatio(0.0);
-//          ((TieredMergePolicy) mergePolicy).setMaxMergeAtOnceExplicit(10000);
-//          ((TieredMergePolicy) mergePolicy).setMaxMergeAtOnce(10000);
-//          ((TieredMergePolicy) mergePolicy).setSegmentsPerTier(10000);
-//          ((TieredMergePolicy) mergePolicy).setSegmentsPerTier(10000);
+          ((TieredMergePolicy) mergePolicy).setMaxMergeAtOnceExplicit(10000);
+          ((TieredMergePolicy) mergePolicy).setMaxMergeAtOnce(10000);
+          ((TieredMergePolicy) mergePolicy).setSegmentsPerTier(10000);
+          ((TieredMergePolicy) mergePolicy).setSegmentsPerTier(10000);
 
         } else if (mergePolicy instanceof LogMergePolicy) {
           ((LogMergePolicy) mergePolicy).setNoCFSRatio(0.0);
@@ -150,8 +143,15 @@ public class TreeMergeOutputFormat extends FileOutputFormat<Text, NullWritable> 
         LOG.info("Logically merging " + shards.size() + " shards into one shard: " + workDir);
         RTimer timer = new RTimer();
 
-        writer.addIndexes(indexes);
-        
+        try{  
+          writer.addIndexes(indexes);
+        }
+        catch (Exception e){
+          
+          LOG.error("Exploded during addIndexes with :" + e + "\n" + Arrays.toString(e.getStackTrace()));
+          throw e;
+        }
+
         LOG.info("Added Indexes: {}", Arrays.toString(indexes));
 
         // TODO: avoid intermediate copying of files into dst directory; rename the files into the dir instead (cp -> rename) 
@@ -196,15 +196,12 @@ public class TreeMergeOutputFormat extends FileOutputFormat<Text, NullWritable> 
 
         LOG.info("Optimizing Solr: Done closing index writer in {}ms", timer.getTime());
         context.setStatus("Done");
-      
-      } 
-      
-      catch(Exception e){
-        
+
+      } catch (Exception e) {
+
         LOG.error("Failed in TreeMergeRecordWriter close: ", e);
         throw e;
-      }
-      finally {
+      } finally {
         heartBeater.cancelHeartBeat();
         heartBeater.close();
       }
@@ -223,10 +220,10 @@ public class TreeMergeOutputFormat extends FileOutputFormat<Text, NullWritable> 
       String taskId = shard.substring("part-m-".length(), shard.length()); // e.g. part-m-00001
       int taskNum = Integer.parseInt(taskId);
       int outputShardNum = taskNum / shards.size();
-      
+
       Path shardNumberFile = new Path(workDir.getParent().getParent(), TreeMergeMapper.SOLR_SHARD_NUMBER);
       LOG.info("Merging into outputShardNum: " + outputShardNum + " from taskId: " + taskId + "at path: " + shardNumberFile);
-      
+
       OutputStream out = shardNumberFile.getFileSystem(context.getConfiguration()).create(shardNumberFile);
       try (Writer writer = new OutputStreamWriter(out, StandardCharsets.UTF_8)) {
         writer.write(String.valueOf(outputShardNum));

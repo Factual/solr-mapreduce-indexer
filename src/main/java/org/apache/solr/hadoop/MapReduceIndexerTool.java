@@ -325,20 +325,25 @@ public class MapReduceIndexerTool extends Configured implements Tool {
     LOG.debug("MTree merge iterations to do: {}", mtreeMergeIterations);
     int mtreeMergeIteration = 1;
     while (reducers > options.shards) { // run a mtree merge iteration
-      job = Job.getInstance(getConf());
-          //messes with solr on hdfs
+      Configuration conf = getConf();
+//      conf.setInt("mapreduce.map.memory.mb", 32768);
+//      conf.set("mapreduce.map.java.opts","-Xmx16384M");
+
+      Job mergeTreeJob = Job.getInstance(conf);
+         
       
-      job.setMapSpeculativeExecution(false);
-      job.setReduceSpeculativeExecution(false);
+      mergeTreeJob.setMapSpeculativeExecution(false);
+      mergeTreeJob.setReduceSpeculativeExecution(false);
     
-      job.setJarByClass(getClass());
-      job.setJobName(getClass().getName() + "/" + Utils.getShortClassName(TreeMergeMapper.class));
-      job.setMapperClass(TreeMergeMapper.class);
-      job.setOutputFormatClass(TreeMergeOutputFormat.class);
-      job.setNumReduceTasks(0);  
-      job.setOutputKeyClass(Text.class);
-      job.setOutputValueClass(NullWritable.class);    
-      job.setInputFormatClass(NLineInputFormat.class);
+      mergeTreeJob.setJarByClass(getClass());
+      mergeTreeJob.setJobName(getClass().getName() + "/" + Utils.getShortClassName(TreeMergeMapper.class));
+      mergeTreeJob.setMapperClass(TreeMergeMapper.class);
+      mergeTreeJob.setOutputFormatClass(TreeMergeOutputFormat.class);
+      
+      mergeTreeJob.setNumReduceTasks(0);  
+      mergeTreeJob.setOutputKeyClass(Text.class);
+      mergeTreeJob.setOutputValueClass(NullWritable.class);    
+      mergeTreeJob.setInputFormatClass(NLineInputFormat.class);
       
       Path inputStepDir = new Path(options.outputDir, "mtree-merge-input-iteration" + mtreeMergeIteration);
       fullInputList = new Path(inputStepDir, FULL_INPUT_LIST);    
@@ -347,17 +352,17 @@ public class MapReduceIndexerTool extends Configured implements Tool {
       if (numFiles != reducers) {
         throw new IllegalStateException("Not same reducers: " + reducers + ", numFiles: " + numFiles);
       }
-      NLineInputFormat.addInputPath(job, fullInputList);
-      NLineInputFormat.setNumLinesPerSplit(job, options.fanout);    
-      FileOutputFormat.setOutputPath(job, outputTreeMergeStep);
+      NLineInputFormat.addInputPath(mergeTreeJob, fullInputList);
+      NLineInputFormat.setNumLinesPerSplit(mergeTreeJob, options.fanout);    
+      FileOutputFormat.setOutputPath(mergeTreeJob, outputTreeMergeStep);
       
       LOG.info("MTree merge iteration {}/{}: Merging {} shards into {} shards using fanout {}", new Object[] { 
           mtreeMergeIteration, mtreeMergeIterations, reducers, (reducers / options.fanout), options.fanout});
       startTime = Instant.now();
-      if (!waitForCompletion(job, options.isVerbose)) {
+      if (!waitForCompletion(mergeTreeJob, options.isVerbose)) {
         return -1; // job failed
       }
-      if (!renameTreeMergeShardDirs(outputTreeMergeStep, job, fs)) {
+      if (!renameTreeMergeShardDirs(outputTreeMergeStep, mergeTreeJob, fs)) {
         return -1;
       }
       endTime = Instant.now();
@@ -558,20 +563,20 @@ public class MapReduceIndexerTool extends Configured implements Tool {
   private Job randomizeManyInputFiles(Configuration baseConfig, Path fullInputList, Path outputStep2Dir, int numLinesPerSplit) 
       throws IOException {
     
-    Job job2 = Job.getInstance(baseConfig);
-    job2.setJarByClass(getClass());
-    job2.setJobName(getClass().getName() + "/" + Utils.getShortClassName(LineRandomizerMapper.class));
-    job2.setInputFormatClass(NLineInputFormat.class);
-    NLineInputFormat.addInputPath(job2, fullInputList);
-    NLineInputFormat.setNumLinesPerSplit(job2, numLinesPerSplit);          
-    job2.setMapperClass(LineRandomizerMapper.class);
-    job2.setReducerClass(LineRandomizerReducer.class);
-    job2.setOutputFormatClass(TextOutputFormat.class);
-    FileOutputFormat.setOutputPath(job2, outputStep2Dir);
-    job2.setNumReduceTasks(1);
-    job2.setOutputKeyClass(LongWritable.class);
-    job2.setOutputValueClass(Text.class);
-    return job2;
+    Job randomizeInputFilesJob = Job.getInstance(baseConfig);
+    randomizeInputFilesJob.setJarByClass(getClass());
+    randomizeInputFilesJob.setJobName(getClass().getName() + "/" + Utils.getShortClassName(LineRandomizerMapper.class));
+    randomizeInputFilesJob.setInputFormatClass(NLineInputFormat.class);
+    NLineInputFormat.addInputPath(randomizeInputFilesJob, fullInputList);
+    NLineInputFormat.setNumLinesPerSplit(randomizeInputFilesJob, numLinesPerSplit);          
+    randomizeInputFilesJob.setMapperClass(LineRandomizerMapper.class);
+    randomizeInputFilesJob.setReducerClass(LineRandomizerReducer.class);
+    randomizeInputFilesJob.setOutputFormatClass(TextOutputFormat.class);
+    FileOutputFormat.setOutputPath(randomizeInputFilesJob, outputStep2Dir);
+    randomizeInputFilesJob.setNumReduceTasks(1);
+    randomizeInputFilesJob.setOutputKeyClass(LongWritable.class);
+    randomizeInputFilesJob.setOutputValueClass(Text.class);
+    return randomizeInputFilesJob;
   }
 
   // do the same as if the user had typed 'hadoop ... --files <file>' 
@@ -664,12 +669,14 @@ public class MapReduceIndexerTool extends Configured implements Tool {
     }
   }
   
-  private int createTreeMergeInputDirList(Path outputReduceDir, FileSystem fs, Path fullInputList)
+private int createTreeMergeInputDirList(Path outputReduceDir, FileSystem fs, Path fullInputList)
       throws FileNotFoundException, IOException {
     
     FileStatus[] dirs = listSortedOutputShardDirs(outputReduceDir, fs);
     int numFiles = 0;
-   FSDataOutputStream out = fs.create(fullInputList); Writer writer = new BufferedWriter(new OutputStreamWriter(out, StandardCharsets.UTF_8));
+    FSDataOutputStream out = fs.create(fullInputList);
+    try {
+      Writer writer = new BufferedWriter(new OutputStreamWriter(out, StandardCharsets.UTF_8));
       for (FileStatus stat : dirs) {
         LOG.debug("Adding path {}", stat.getPath());
         Path dir = new Path(stat.getPath(), "data/index");
@@ -679,15 +686,24 @@ public class MapReduceIndexerTool extends Configured implements Tool {
         writer.write(dir.toString() + "\n");
         numFiles++;
       }
-    
+      writer.close();
+    } finally {
+      out.close();
+    }
     return numFiles;
   }
 
-  private FileStatus[] listSortedOutputShardDirs(Path outputReduceDir, FileSystem fs) throws FileNotFoundException,
+
+    private FileStatus[] listSortedOutputShardDirs(Path outputReduceDir, FileSystem fs) throws FileNotFoundException,
       IOException {
     
     final String dirPrefix = SolrOutputFormat.getOutputName(job);
-    FileStatus[] dirs = fs.listStatus(outputReduceDir, (Path path) -> path.getName().startsWith(dirPrefix));
+    FileStatus[] dirs = fs.listStatus(outputReduceDir, new PathFilter() {      
+      @Override
+      public boolean accept(Path path) {
+        return path.getName().startsWith(dirPrefix);
+      }
+    });
     for (FileStatus dir : dirs) {
       if (!dir.isDirectory()) {
         throw new IllegalStateException("Not a directory: " + dir.getPath());
@@ -729,9 +745,14 @@ public class MapReduceIndexerTool extends Configured implements Tool {
    * 
    * Also see TreeMergeOutputFormat.TreeMergeRecordWriter.writeShardNumberFile()
    */
-  private boolean renameTreeMergeShardDirs(Path outputTreeMergeStep, Job job, FileSystem fs) throws IOException {
+   private boolean renameTreeMergeShardDirs(Path outputTreeMergeStep, Job job, FileSystem fs) throws IOException {
     final String dirPrefix = SolrOutputFormat.getOutputName(job);
-    FileStatus[] dirs = fs.listStatus(outputTreeMergeStep, (Path path) -> path.getName().startsWith(dirPrefix));
+    FileStatus[] dirs = fs.listStatus(outputTreeMergeStep, new PathFilter() {      
+      @Override
+      public boolean accept(Path path) {
+        return path.getName().startsWith(dirPrefix);
+      }
+    });
     
     for (FileStatus dir : dirs) {
       if (!dir.isDirectory()) {
@@ -756,10 +777,9 @@ public class MapReduceIndexerTool extends Configured implements Tool {
       // read auxiliary metadata file (per task) that tells which taskId 
       // processed which split# aka solrShard
       Path solrShardNumberFile = new Path(renamedPath, TreeMergeMapper.SOLR_SHARD_NUMBER);
-      byte[] bytes;
       InputStream in = fs.open(solrShardNumberFile);
-      bytes = ByteStreams.toByteArray(in);
-      
+      byte[] bytes = ByteStreams.toByteArray(in);
+      in.close();
       Preconditions.checkArgument(bytes.length > 0);
       int solrShard = Integer.parseInt(new String(bytes, StandardCharsets.UTF_8));
       if (!delete(solrShardNumberFile, false, fs)) {
@@ -779,8 +799,6 @@ public class MapReduceIndexerTool extends Configured implements Tool {
     }
     return true;
   }
-
-  
 
 
   private boolean waitForCompletion(Job job, boolean isVerbose) 
