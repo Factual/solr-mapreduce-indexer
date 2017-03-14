@@ -6,10 +6,16 @@ It's repackaged as a maven project using the shade plugin to avoid package and m
 
 This one is built with solr 6.4.2, which is, at the moment, current.
 
-## known issues
+## how it works
 
-- The tree merge functionality, even in its original state, fails and should be avoided.  To do this, specify the same number of reducers as you want in final shards.  This makes it take longer but without the pesky mysterious failure.
+### Morphline Mapper and Solr Reducer
 
+### Merge Solr Indices to Number of Shards
+
+### Go Live
+
+
+## Options
 
 
 
