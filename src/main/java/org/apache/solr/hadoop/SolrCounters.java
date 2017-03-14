@@ -44,6 +44,7 @@ public enum SolrCounters {
     this.label = label;
   }
   
+  @Override
   public String toString() {
     return label;
   }

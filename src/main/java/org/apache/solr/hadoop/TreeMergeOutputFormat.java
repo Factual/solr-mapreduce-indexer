@@ -35,6 +35,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.lucene.analysis.core.WhitespaceAnalyzer;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.IndexWriterConfig.OpenMode;
@@ -80,6 +81,9 @@ public class TreeMergeOutputFormat extends FileOutputFormat<Text, NullWritable> 
       this.workDir = new Path(workDir, "data/index");
       this.heartBeater = new HeartBeater(context);
       this.context = context;
+
+      //without this setting, exceptions about the filesystem being closed will irredeemably rob you of hours of your life.  sad.
+      context.getConfiguration().setBoolean("fs.hdfs.impl.disable.cache", true);
     }
 
     @Override
@@ -96,24 +100,19 @@ public class TreeMergeOutputFormat extends FileOutputFormat<Text, NullWritable> 
 
     @Override
     public void close(TaskAttemptContext context) throws IOException {
-      if (closeCalledOnce == true) {
-        throw new IOException("Oh noes!  Closed called again.");
-      } else {
-        closeCalledOnce = true;
-      }
 
       LOG.debug("Task " + context.getTaskAttemptID() + " merging into dstDir: " + workDir + ", srcDirs: " + shards);
-      
+
       writeShardNumberFile(context);
-      
+
       heartBeater.needHeartBeat();
       try {
-
         Directory mergedIndex = new HdfsDirectory(workDir, context.getConfiguration());
 
-        IndexWriterConfig writerConfig = new IndexWriterConfig()
+        IndexWriterConfig writerConfig = new IndexWriterConfig(new WhitespaceAnalyzer())
                 .setOpenMode(OpenMode.CREATE)
                 .setUseCompoundFile(false)
+                .setCommitOnClose(true)
                 .setRAMBufferSizeMB(256);
 
         MergePolicy mergePolicy = writerConfig.getMergePolicy();
@@ -143,11 +142,10 @@ public class TreeMergeOutputFormat extends FileOutputFormat<Text, NullWritable> 
         LOG.info("Logically merging " + shards.size() + " shards into one shard: " + workDir);
         RTimer timer = new RTimer();
 
-        try{  
+        try {
           writer.addIndexes(indexes);
-        }
-        catch (Exception e){
-          
+        } catch (Exception e) {
+
           LOG.error("Exploded during addIndexes with :" + e + "\n" + Arrays.toString(e.getStackTrace()));
           throw e;
         }

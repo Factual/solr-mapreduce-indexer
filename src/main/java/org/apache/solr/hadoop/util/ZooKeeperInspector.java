@@ -190,8 +190,17 @@ public final class ZooKeeperInspector {
       Files.move(dir, confDir);
       dir = confDir.getParentFile();
     }
+  
     FileUtils.writeStringToFile(new File(dir, "solr.xml"), "<solr><solrcloud></solrcloud></solr>", "UTF-8");
+    LOG.info("Wrote solr configs to: {}", confDir);
+ 
     verifyConfigDir(confDir);
+    String confPath = confDir.getAbsolutePath();
+    
+    File newPath = new File(confPath.substring(0,confPath.length()-"conf".length()) + "/core1/conf");
+    LOG.info("Copy solr configs to: {}", newPath);
+    FileUtils.copyDirectory(confDir, newPath);
+    
     return dir;
   }
   

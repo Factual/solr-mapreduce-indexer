@@ -50,6 +50,7 @@ class GoLive {
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   
   // TODO: handle clusters with replicas
+  // @bfs: This expects the same number of shards as there are shards on the server, otherwise, it just fails.
   public boolean goLive(Options options, FileStatus[] outDirs) {
     LOG.info("Live merging of output shards into Solr cluster...");
     boolean success = false;

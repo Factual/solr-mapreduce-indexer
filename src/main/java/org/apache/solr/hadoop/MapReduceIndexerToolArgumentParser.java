@@ -1,6 +1,8 @@
 package org.apache.solr.hadoop;
 
 
+import org.apache.solr.hadoop.util.PathArgumentType;
+import com.google.common.collect.Lists;
 import org.apache.solr.hadoop.util.Utils;
 import org.apache.solr.hadoop.util.ToolRunnerHelpFormatter;
 import org.apache.solr.hadoop.util.ZooKeeperInspector;
@@ -10,6 +12,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.impl.Arguments;
 import net.sourceforge.argparse4j.impl.action.HelpArgumentAction;
@@ -23,7 +26,6 @@ import net.sourceforge.argparse4j.inf.FeatureControl;
 import net.sourceforge.argparse4j.inf.Namespace;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import static org.apache.solr.hadoop.MapReduceIndexerTool.buildShardUrls;
 import org.apache.solr.hadoop.dedup.RetainMostRecentUpdateConflictResolver;
 import org.apache.solr.hadoop.morphline.MorphlineMapRunner;
 import org.kitesdk.morphline.base.Fields;
@@ -459,6 +461,15 @@ public final class MapReduceIndexerToolArgumentParser {
   private String nonSolrCloud(String msg) {
     return showNonSolrCloud ? msg : "";
   }
+  
+  static List<List<String>> buildShardUrls(List<Object> urls, Integer numShards) {
+    if (urls == null) return null;
+    return  Lists.partition(
+              urls.stream()
+                  .map(u -> u.toString())
+                  .collect(Collectors.toList()),numShards);   
+  }
+  
 
   /**
    * Marker trick to prevent processing of any remaining arguments once --help

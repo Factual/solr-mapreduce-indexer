@@ -31,7 +31,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.mapreduce.Mapper.Context;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.hadoop.util.HdfsFileFieldNames;
-import org.apache.solr.hadoop.PathParts;
+import org.apache.solr.hadoop.util.PathParts;
 import org.apache.solr.hadoop.util.Utils;
 import org.apache.solr.morphlines.solr.DocumentLoader;
 import org.apache.solr.morphlines.solr.SolrLocator;
