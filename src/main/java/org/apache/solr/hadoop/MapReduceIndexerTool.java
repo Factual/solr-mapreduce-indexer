@@ -134,7 +134,7 @@ public class MapReduceIndexerTool extends Configured implements Tool {
     LOG.info("Cluster reports {} mapper slots", mappers);
 
     if (options.mappers == -1) {
-      mappers = 8 * mappers; // better accomodate stragglers
+      mappers = 8 * mappers; // better accommodate stragglers
     } else {
       mappers = options.mappers;
     }
@@ -286,26 +286,13 @@ public class MapReduceIndexerTool extends Configured implements Tool {
     if (reducers > options.shards) {
       LOG.info("The number of reducers is greater than the number of shards.  Invoking the tree merge process");
       IndexMergeTool treeMergeRunner = new IndexMergeTool();
-      
-      int result = treeMergeRunner.merge(outputReduceDir, options.outputDir, options.shards,options.fanout, getConf());
-      if (result != 0) {
-        return result;
-      }
+      int numIterations = treeMergeRunner.merge(outputReduceDir, options.outputDir, options.shards,options.fanout, getConf());
+      LOG.info("Completed {} merge iterations.", numIterations);
     }
 
-    // normalize output shard dir prefix, i.e.
-    // rename part-r-00000 to part-00000 (stems from zero tree merge iterations)
-    // rename part-m-00000 to part-00000 (stems from > 0 tree merge iterations)
-    for (FileStatus stats : fs.listStatus(outputReduceDir)) {
-      String dirPrefix = SolrOutputFormat.getOutputName(job);
-      Path srcPath = stats.getPath();
-      if (stats.isDirectory() && srcPath.getName().startsWith(dirPrefix)) {
-        String dstName = dirPrefix + srcPath.getName().substring(dirPrefix.length() + "-m".length());
-        Path dstPath = new Path(srcPath.getParent(), dstName);
-        if (!Utils.rename(srcPath, dstPath, fs)) {
-          return -1;
-        }
-      }
+    // rename files with -m and -r segments to drop those
+    if (!renameIntermediateFiles(fs,outputReduceDir,SolrOutputFormat.getOutputName(job))) {
+      return -1;
     }
 
     // publish results dir    
@@ -516,6 +503,24 @@ public class MapReduceIndexerTool extends Configured implements Tool {
       }
       runner.cleanup();
     }
+  }
+
+  private boolean renameIntermediateFiles(FileSystem fs, Path path, String dirPrefix) throws IOException {
+    // normalize output shard dir prefix, i.e.
+    // rename part-r-00000 to part-00000 (stems from zero tree merge iterations)
+    // rename part-m-00000 to part-00000 (stems from > 0 tree merge iterations)
+    final int extraPartLength = "-m".length();
+    for (FileStatus stats : fs.listStatus(path)) {
+      Path srcPath = stats.getPath();
+      if (stats.isDirectory() && srcPath.getName().startsWith(dirPrefix)) {
+        String dstName = dirPrefix + srcPath.getName().substring(dirPrefix.length() + extraPartLength);
+        Path dstPath = new Path(srcPath.getParent(), dstName);
+        if (!Utils.rename(srcPath, dstPath, fs)) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
 }

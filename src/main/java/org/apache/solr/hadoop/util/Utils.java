@@ -213,8 +213,7 @@ public final class Utils {
     randomizeInputFilesJob.setOutputValueClass(Text.class);
     return randomizeInputFilesJob;
   }
-  
-  
+
 
 
 }

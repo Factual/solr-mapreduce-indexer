@@ -93,12 +93,7 @@ class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
   /**
    * The location in a local temporary directory that the index is built in.
    */
-//  /**
-//   * If true, create a zip file of the completed index in the final storage
-//   * location A .zip will be appended to the final output name if it is not
-//   * already present.
-//   */
-//  private boolean outputZipFile = false;
+
   private final HeartBeater heartBeater;
   private final BatchWriter batchWriter;
   private final List<SolrInputDocument> batch;
@@ -253,14 +248,7 @@ class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
       }
       LOG.info("docsWritten: {}", numDocsWritten);
       batchWriter.close(context);
-//      if (outputZipFile) {
-//        context.setStatus("Writing Zip");
-//        packZipFile(); // Written to the perm location
-//      } else {
-//        context.setStatus("Copying Index");
-//        fs.completeLocalOutput(perm, temp); // copy to dfs
-//      }
-    } catch (IOException | SolrServerException | InterruptedException e) {
+   } catch (IOException | SolrServerException | InterruptedException e) {
       if (e instanceof IOException) {
         throw (IOException) e;
       }
@@ -268,214 +256,8 @@ class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
     } finally {
       heartBeater.cancelHeartBeat();
       heartBeater.close();
-      
-//      File tempFile = new File(temp.toString());
-//      if (tempFile.exists()) {
-//        FileUtils.forceDelete(new File(temp.toString()));
-//      }
-    }
+   }
 
     context.setStatus("Done");
   }
-
-//  private void packZipFile() throws IOException {
-//    FSDataOutputStream out = null;
-//    ZipOutputStream zos = null;
-//    int zipCount = 0;
-//    LOG.info("Packing zip file for " + perm);
-//    try {
-//      out = fs.create(perm, false);
-//      zos = new ZipOutputStream(out);
-//
-//      String name = perm.getName().replaceAll(".zip$", "");
-//      LOG.info("adding index directory" + temp);
-//      zipCount = zipDirectory(conf, zos, name, temp.toString(), temp);
-//      /**
-//      for (String configDir : allowedConfigDirectories) {
-//        if (!isRequiredConfigDirectory(configDir)) {
-//          continue;
-//        }
-//        final Path confPath = new Path(solrHome, configDir);
-//        LOG.info("adding configdirectory" + confPath);
-//
-//        zipCount += zipDirectory(conf, zos, name, solrHome.toString(), confPath);
-//      }
-//      **/
-//    } catch (Throwable ohFoo) {
-//      LOG.error("packZipFile exception", ohFoo);
-//      if (ohFoo instanceof RuntimeException) {
-//        throw (RuntimeException) ohFoo;
-//      }
-//      if (ohFoo instanceof IOException) {
-//        throw (IOException) ohFoo;
-//      }
-//      throw new IOException(ohFoo);
-//
-//    } finally {
-//      if (zos != null) {
-//        if (zipCount == 0) { // If no entries were written, only close out, as
-//                             // the zip will throw an error
-//          LOG.error("No entries written to zip file " + perm);
-//          fs.delete(perm, false);
-//          // out.close();
-//        } else {
-//          LOG.info(String.format("Wrote %d items to %s for %s", zipCount, perm,
-//              temp));
-//          zos.close();
-//        }
-//      }
-//    }
-//  }
-//
-//  /**
-//   * Write a file to a zip output stream, removing leading path name components
-//   * from the actual file name when creating the zip file entry.
-//   * 
-//   * The entry placed in the zip file is <code>baseName</code>/
-//   * <code>relativePath</code>, where <code>relativePath</code> is constructed
-//   * by removing a leading <code>root</code> from the path for
-//   * <code>itemToZip</code>.
-//   * 
-//   * If <code>itemToZip</code> is an empty directory, it is ignored. If
-//   * <code>itemToZip</code> is a directory, the contents of the directory are
-//   * added recursively.
-//   * 
-//   * @param zos The zip output stream
-//   * @param baseName The base name to use for the file name entry in the zip
-//   *        file
-//   * @param root The path to remove from <code>itemToZip</code> to make a
-//   *        relative path name
-//   * @param itemToZip The path to the file to be added to the zip file
-//   * @return the number of entries added
-//   * @throws IOException
-//   */
-//  static public int zipDirectory(final Configuration conf,
-//      final ZipOutputStream zos, final String baseName, final String root,
-//      final Path itemToZip) throws IOException {
-//    LOG
-//        .info(String
-//            .format("zipDirectory: %s %s %s", baseName, root, itemToZip));
-//    LocalFileSystem localFs = FileSystem.getLocal(conf);
-//    int count = 0;
-//
-//    final FileStatus itemStatus = localFs.getFileStatus(itemToZip);
-//    if (itemStatus.isDirectory()) {
-//      final FileStatus[] statai = localFs.listStatus(itemToZip);
-//
-//      // Add a directory entry to the zip file
-//      final String zipDirName = relativePathForZipEntry(itemToZip.toUri()
-//          .getPath(), baseName, root);
-//      final ZipEntry dirZipEntry = new ZipEntry(zipDirName
-//          + Path.SEPARATOR_CHAR);
-//      LOG.info(String.format("Adding directory %s to zip", zipDirName));
-//      zos.putNextEntry(dirZipEntry);
-//      zos.closeEntry();
-//      count++;
-//
-//      if (statai == null || statai.length == 0) {
-//        LOG.info(String.format("Skipping empty directory %s", itemToZip));
-//        return count;
-//      }
-//      for (FileStatus status : statai) {
-//        count += zipDirectory(conf, zos, baseName, root, status.getPath());
-//      }
-//      LOG.info(String.format("Wrote %d entries for directory %s", count,
-//          itemToZip));
-//      return count;
-//    }
-//
-//    final String inZipPath = relativePathForZipEntry(itemToZip.toUri()
-//        .getPath(), baseName, root);
-//
-//    if (inZipPath.length() == 0) {
-//      LOG.warn(String.format("Skipping empty zip file path for %s (%s %s)",
-//          itemToZip, root, baseName));
-//      return 0;
-//    }
-//
-//    // Take empty files in case the place holder is needed
-//    FSDataInputStream in = null;
-//    try {
-//      in = localFs.open(itemToZip);
-//      final ZipEntry ze = new ZipEntry(inZipPath);
-//      ze.setTime(itemStatus.getModificationTime());
-//      // Comments confuse looking at the zip file
-//      // ze.setComment(itemToZip.toString());
-//      zos.putNextEntry(ze);
-//
-//      IOUtils.copyBytes(in, zos, conf, false);
-//      zos.closeEntry();
-//      LOG.info(String.format("Wrote %d entries for file %s", count, itemToZip));
-//      return 1;
-//    } finally {
-//      in.close();
-//    }
-//
-//  }
-//
-//  static String relativePathForZipEntry(final String rawPath,
-//      final String baseName, final String root) {
-//    String relativePath = rawPath.replaceFirst(Pattern.quote(root.toString()),
-//        "");
-//    LOG.info(String.format("RawPath %s, baseName %s, root %s, first %s",
-//        rawPath, baseName, root, relativePath));
-//
-//    if (relativePath.startsWith(Path.SEPARATOR)) {
-//      relativePath = relativePath.substring(1);
-//    }
-//    LOG.info(String.format(
-//        "RawPath %s, baseName %s, root %s, post leading slash %s", rawPath,
-//        baseName, root, relativePath));
-//    if (relativePath.isEmpty()) {
-//      LOG.warn(String.format(
-//          "No data after root (%s) removal from raw path %s", root, rawPath));
-//      return baseName;
-//    }
-//    // Construct the path that will be written to the zip file, including
-//    // removing any leading '/' characters
-//    String inZipPath = baseName + Path.SEPARATOR_CHAR + relativePath;
-//
-//    LOG.info(String.format("RawPath %s, baseName %s, root %s, inZip 1 %s",
-//        rawPath, baseName, root, inZipPath));
-//    if (inZipPath.startsWith(Path.SEPARATOR)) {
-//      inZipPath = inZipPath.substring(1);
-//    }
-//    LOG.info(String.format("RawPath %s, baseName %s, root %s, inZip 2 %s",
-//        rawPath, baseName, root, inZipPath));
-//
-//    return inZipPath;
-//
-//  }
-//  
-  /*
-  static boolean setLogLevel(String packageName, String level) {
-    Log logger = LogFactory.getLog(packageName);
-    if (logger == null) {
-      return false;
-    }
-    // look for: org.apache.commons.logging.impl.SLF4JLocationAwareLog
-    LOG.warn("logger class:"+logger.getClass().getName());
-    if (logger instanceof Log4JLogger) {
-      process(((Log4JLogger) logger).getLogger(), level);
-      return true;
-    }
-    if (logger instanceof Jdk14Logger) {
-      process(((Jdk14Logger) logger).getLogger(), level);
-      return true;
-    }
-    return false;
-  }
-
-  public static void process(org.apache.log4j.Logger log, String level) {
-    if (level != null) {
-      log.setLevel(org.apache.log4j.Level.toLevel(level));
-    }
-  }
-
-  public static void process(java.util.logging.Logger log, String level) {
-    if (level != null) {
-      log.setLevel(java.util.logging.Level.parse(level));
-    }
-  }
-   */
 }
