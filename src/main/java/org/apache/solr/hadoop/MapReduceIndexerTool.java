@@ -16,7 +16,6 @@
  */
 package org.apache.solr.hadoop;
 
-
 import org.apache.solr.hadoop.util.Utils;
 import org.apache.solr.hadoop.util.ZooKeeperInspector;
 import java.io.BufferedInputStream;
@@ -63,32 +62,35 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 import java.time.Instant;
 
-
 /**
- * Public API for a MapReduce batch job driver that creates a set of Solr index shards from a set of
- * input files and writes the indexes into HDFS, in a flexible, scalable and fault-tolerant manner.
- * Also supports merging the output shards into a set of live customer facing Solr servers,
- * typically a SolrCloud.
+ * Public API for a MapReduce batch job driver that creates a set of Solr index
+ * shards from a set of input files and writes the indexes into HDFS, in a
+ * flexible, scalable and fault-tolerant manner. Also supports merging the
+ * output shards into a set of live customer facing Solr servers, typically a
+ * SolrCloud.
  */
 public class MapReduceIndexerTool extends Configured implements Tool {
-  
+
   public static final String RESULTS_DIR = "results";
   static final int MAX_FILES_TO_RANDOMIZE_IN_MEMORY = 10000000;
-  static final String MAIN_MEMORY_RANDOMIZATION_THRESHOLD =  MapReduceIndexerTool.class.getName() + ".mainMemoryRandomizationThreshold";
-  public static final String FULL_INPUT_LIST = "full-input-list.txt"; 
+  static final String MAIN_MEMORY_RANDOMIZATION_THRESHOLD = MapReduceIndexerTool.class.getName() + ".mainMemoryRandomizationThreshold";
+  public static final String FULL_INPUT_LIST = "full-input-list.txt";
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   Job job;
-  
-  
-  /** API for command line clients
+
+  /**
+   * API for command line clients
+   *
    * @param args
-   * @throws java.lang.Exception */
-  public static void main(String[] args) throws Exception  {
+   * @throws java.lang.Exception
+   */
+  public static void main(String[] args) throws Exception {
     int res = ToolRunner.run(new Configuration(), new MapReduceIndexerTool(), args);
     System.exit(res);
   }
 
-  public MapReduceIndexerTool() {}
+  public MapReduceIndexerTool() {
+  }
 
   @Override
   public int run(String[] args) throws Exception {
@@ -99,20 +101,20 @@ public class MapReduceIndexerTool extends Configured implements Tool {
     }
     return run(opts);
   }
-  
-  /** API for Java clients; visible for testing; may become a public API eventually */
-  int run(MapReduceIndexerToolArgumentParser.Options options) throws Exception {
-    
 
-  
+  /**
+   * API for Java clients; visible for testing; may become a public API
+   * eventually
+   */
+  int run(MapReduceIndexerToolArgumentParser.Options options) throws Exception {
+
     Instant programStart = Instant.now();
-    
+
     if (options.fairSchedulerPool != null) {
       getConf().set("mapred.fairscheduler.pool", options.fairSchedulerPool);
     }
     getConf().setInt(SolrOutputFormat.SOLR_RECORD_WRITER_MAX_SEGMENTS, options.maxSegments);
-    
-  
+
     if (options.log4jConfigFile != null) {
       Utils.setLogConfigFile(options.log4jConfigFile, getConf());
       addDistributedCacheFile(options.log4jConfigFile, getConf());
@@ -126,12 +128,12 @@ public class MapReduceIndexerTool extends Configured implements Tool {
     }
     MapReduceIndexerToolArgumentParser.verifyGoLiveArgs(options, null);
     MapReduceIndexerToolArgumentParser.verifyZKStructure(options, null);
-    
+
     int mappers = new JobClient(job.getConfiguration()).getClusterStatus().getMaxMapTasks();
-    
+
     LOG.info("Cluster reports {} mapper slots", mappers);
-    
-    if (options.mappers == -1) { 
+
+    if (options.mappers == -1) {
       mappers = 8 * mappers; // better accomodate stragglers
     } else {
       mappers = options.mappers;
@@ -140,18 +142,18 @@ public class MapReduceIndexerTool extends Configured implements Tool {
       throw new IllegalStateException("Illegal number of mappers: " + mappers);
     }
     options.mappers = mappers;
-    
+
     FileSystem fs = options.outputDir.getFileSystem(job.getConfiguration());
     if (fs.exists(options.outputDir) && !Utils.delete(options.outputDir, true, fs)) {
       return -1;
     }
     Path outputResultsDir = new Path(options.outputDir, RESULTS_DIR);
     Path outputReduceDir = new Path(options.outputDir, "reducers");
-    Path outputStep1Dir = new Path(options.outputDir, "tmp1");    
-    Path outputStep2Dir = new Path(options.outputDir, "tmp2");    
-    
+    Path outputStep1Dir = new Path(options.outputDir, "tmp1");
+    Path outputStep2Dir = new Path(options.outputDir, "tmp2");
+
     Path fullInputList = new Path(outputStep1Dir, FULL_INPUT_LIST);
-    
+
     LOG.debug("Creating list of input files for mappers: {}", fullInputList);
     long numFiles = addInputFiles(options.inputFiles, options.inputLists, fullInputList, job.getConfiguration());
     if (numFiles == 0) {
@@ -167,14 +169,13 @@ public class MapReduceIndexerTool extends Configured implements Tool {
     int realMappers = Math.min(mappers, (int) Utils.ceilDivide(numFiles, numLinesPerSplit));
     calculateNumReducers(options, realMappers);
     int reducers = options.reducers;
-    LOG.info("Using these parameters: " +
-        "numFiles: {}, mappers: {}, realMappers: {}, reducers: {}, shards: {}, fanout: {}, maxSegments: {}",
-        new Object[] {numFiles, mappers, realMappers, reducers, options.shards, options.fanout, options.maxSegments});
-        
-    
+    LOG.info("Using these parameters: "
+            + "numFiles: {}, mappers: {}, realMappers: {}, reducers: {}, shards: {}, fanout: {}, maxSegments: {}",
+            new Object[]{numFiles, mappers, realMappers, reducers, options.shards, options.fanout, options.maxSegments});
+
     LOG.info("Randomizing list of {} input files to spread indexing load more evenly among mappers", numFiles);
     Instant startTime = Instant.now();
-    int maxFilesToRandomizeInMemory =  job.getConfiguration().getInt(MAIN_MEMORY_RANDOMIZATION_THRESHOLD, MAX_FILES_TO_RANDOMIZE_IN_MEMORY);
+    int maxFilesToRandomizeInMemory = job.getConfiguration().getInt(MAIN_MEMORY_RANDOMIZATION_THRESHOLD, MAX_FILES_TO_RANDOMIZE_IN_MEMORY);
     if (numFiles < maxFilesToRandomizeInMemory) {
       // If there are few input files reduce latency by directly running main memory randomization 
       // instead of launching a high latency MapReduce job
@@ -191,13 +192,12 @@ public class MapReduceIndexerTool extends Configured implements Tool {
     }
     Instant endTime = Instant.now();
     LOG.info("Done. Randomizing list of {} input files took {}", numFiles, Duration.between(startTime, endTime));
-    
-    
+
     job.setInputFormatClass(NLineInputFormat.class);
     NLineInputFormat.addInputPath(job, outputStep2Dir);
-    NLineInputFormat.setNumLinesPerSplit(job, numLinesPerSplit);    
+    NLineInputFormat.setNumLinesPerSplit(job, numLinesPerSplit);
     FileOutputFormat.setOutputPath(job, outputReduceDir);
-    
+
     String mapperClass = job.getConfiguration().get(JobContext.MAP_CLASS_ATTR);
     if (mapperClass == null) { // enable customization
       Class clazz = MorphlineMapper.class;
@@ -205,7 +205,7 @@ public class MapReduceIndexerTool extends Configured implements Tool {
       job.setMapperClass(clazz);
     }
     job.setJobName(getClass().getName() + "/" + Utils.getShortClassName(mapperClass));
-    
+
     if (job.getConfiguration().get(JobContext.REDUCE_CLASS_ATTR) == null) { // enable customization
       job.setReducerClass(SolrReducer.class);
     }
@@ -213,7 +213,7 @@ public class MapReduceIndexerTool extends Configured implements Tool {
       throw new IllegalArgumentException("updateConflictResolver must not be null");
     }
     job.getConfiguration().set(SolrReducer.UPDATE_CONFLICT_RESOLVER, options.updateConflictResolver);
-    
+
     if (options.zkHost != null) {
       assert options.collection != null;
       /*
@@ -249,7 +249,7 @@ public class MapReduceIndexerTool extends Configured implements Tool {
         options.solrHomeDir = tmpSolrHomeDir;
       }
     }
-    
+
     MorphlineMapRunner runner = setupMorphline(options);
     if (options.isDryRun && runner != null) {
       LOG.info("Indexing {} files in dryrun mode", numFiles);
@@ -259,22 +259,21 @@ public class MapReduceIndexerTool extends Configured implements Tool {
       LOG.info("Done. Indexing {} files in dryrun mode took {}", numFiles, Duration.between(startTime, endTime));
       Utils.goodbye(null, programStart);
       return 0;
-    }          
+    }
     job.getConfiguration().set(MorphlineMapRunner.MORPHLINE_FILE_PARAM, options.morphlineFile.getName());
 
-    job.setNumReduceTasks(reducers);  
+    job.setNumReduceTasks(reducers);
     job.setOutputKeyClass(Text.class);
     job.setOutputValueClass(SolrInputDocumentWritable.class);
-    LOG.info("Indexing {} files using {} real mappers into {} reducers", new Object[] {numFiles, realMappers, reducers});
-    
-    
+    LOG.info("Indexing {} files using {} real mappers into {} reducers", new Object[]{numFiles, realMappers, reducers});
+
     //messes with solr on hdfs
     job.setMapSpeculativeExecution(false);
     job.setReduceSpeculativeExecution(false);
-    
+
     //crank up memory on reducers
     job.getConfiguration().setInt("mapreduce.reduce.memory.mb", 32768);
-    job.getConfiguration().set("mapreduce.reduce.java.opts","-Xmx16384M");
+    job.getConfiguration().set("mapreduce.reduce.java.opts", "-Xmx16384M");
 
     startTime = Instant.now();
     if (!Utils.waitForCompletion(job, options.isVerbose)) {
@@ -282,16 +281,18 @@ public class MapReduceIndexerTool extends Configured implements Tool {
     }
 
     endTime = Instant.now();
-    LOG.info("Done. Indexing {} files using {} real mappers into {} reducers took {}", new Object[] {numFiles, realMappers, reducers, Duration.between(startTime, endTime)});
+    LOG.info("Done. Indexing {} files using {} real mappers into {} reducers took {}", new Object[]{numFiles, realMappers, reducers, Duration.between(startTime, endTime)});
 
-  
     if (reducers > options.shards) {
       LOG.info("The number of reducers is greater than the number of shards.  Invoking the tree merge process");
-      TreeMergeRunner treeMergeRunner = new TreeMergeRunner();
-      treeMergeRunner.run(outputReduceDir, options, getConf());
+      IndexMergeTool treeMergeRunner = new IndexMergeTool();
+      
+      int result = treeMergeRunner.merge(outputReduceDir, options.outputDir, options.shards,options.fanout, getConf());
+      if (result != 0) {
+        return result;
+      }
     }
-    
-    
+
     // normalize output shard dir prefix, i.e.
     // rename part-r-00000 to part-00000 (stems from zero tree merge iterations)
     // rename part-m-00000 to part-00000 (stems from > 0 tree merge iterations)
@@ -303,10 +304,10 @@ public class MapReduceIndexerTool extends Configured implements Tool {
         Path dstPath = new Path(srcPath.getParent(), dstName);
         if (!Utils.rename(srcPath, dstPath, fs)) {
           return -1;
-        }        
+        }
       }
-    }    
-    
+    }
+
     // publish results dir    
     if (!Utils.rename(outputReduceDir, outputResultsDir, fs)) {
       return -1;
@@ -315,8 +316,8 @@ public class MapReduceIndexerTool extends Configured implements Tool {
     if (options.goLive && !new GoLive().goLive(options, Utils.listSortedOutputShardDirs(outputResultsDir, fs, job))) {
       return -1;
     }
-    
-    Utils.goodbye(job, programStart);    
+
+    Utils.goodbye(job, programStart);
     return 0;
   }
 
@@ -330,11 +331,9 @@ public class MapReduceIndexerTool extends Configured implements Tool {
     if (realMappers <= 0) {
       throw new IllegalStateException("Illegal realMappers: " + realMappers);
     }
-    
 
- 
     int reducers = new JobClient(job.getConfiguration()).getClusterStatus().getMaxReduceTasks();
-       
+
     LOG.info("Cluster reports {} reduce slots", reducers);
 
     switch (options.reducers) {
@@ -347,21 +346,22 @@ public class MapReduceIndexerTool extends Configured implements Tool {
       default:
         if (options.reducers == 0) {
           throw new IllegalStateException("Illegal zero reducers");
-        } reducers = options.reducers;
+        }
+        reducers = options.reducers;
         break;
     }
     reducers = Math.max(reducers, options.shards);
-    
+
     if (reducers != options.shards) {
       // Ensure fanout isn't misconfigured. fanout can't meaningfully be larger than what would be 
       // required to merge all leaf shards in one single tree merge iteration into root shards
       options.fanout = Math.min(options.fanout, (int) Utils.ceilDivide(reducers, options.shards));
-      
+
       // Ensure invariant reducers == options.shards * (fanout ^ N) where N is an integer >= 1.
       // N is the number of mtree merge iterations.
       // This helps to evenly spread docs among root shards and simplifies the impl of the mtree merge algorithm.
       int s = options.shards;
-      while (s < reducers) { 
+      while (s < reducers) {
         s = s * options.fanout;
       }
       reducers = s;
@@ -369,19 +369,19 @@ public class MapReduceIndexerTool extends Configured implements Tool {
     }
     options.reducers = reducers;
   }
-  
-  private long addInputFiles(List<Path> inputFiles, List<Path> inputLists, Path fullInputList, Configuration conf) 
-      throws IOException {
-    
+
+  private long addInputFiles(List<Path> inputFiles, List<Path> inputLists, Path fullInputList, Configuration conf)
+          throws IOException {
+
     long numFiles = 0;
     FileSystem fs = fullInputList.getFileSystem(conf);
     try (FSDataOutputStream out = fs.create(fullInputList); Writer writer = new BufferedWriter(new OutputStreamWriter(out, StandardCharsets.UTF_8))) {
-      
+
       for (Path inputFile : inputFiles) {
         FileSystem inputFileFs = inputFile.getFileSystem(conf);
         if (inputFileFs.exists(inputFile)) {
           PathFilter pathFilter = (Path path) -> !(path.getName().startsWith(".") || path.getName().startsWith("_")) // ignore "hidden" files and dirs
-          ;
+                  ;
           numFiles += addInputFilesRecursively(inputFile, writer, inputFileFs, pathFilter);
         }
       }
@@ -405,14 +405,14 @@ public class MapReduceIndexerTool extends Configured implements Tool {
           in.close();
         }
       }
-      
-    }    
+
+    }
     return numFiles;
   }
-  
+
   /**
-   * Add the specified file to the input set, if path is a directory then
-   * add the files contained therein.
+   * Add the specified file to the input set, if path is a directory then add
+   * the files contained therein.
    */
   private long addInputFilesRecursively(Path path, Writer writer, FileSystem fs, PathFilter pathFilter) throws IOException {
     long numFiles = 0;
@@ -427,34 +427,33 @@ public class MapReduceIndexerTool extends Configured implements Tool {
     }
     return numFiles;
   }
-  
-  
+
   // do the same as if the user had typed 'hadoop ... --files <file>' 
   private void addDistributedCacheFile(File file, Configuration conf) throws IOException {
     String HADOOP_TMP_FILES = "tmpfiles"; // see Hadoop's GenericOptionsParser
     String tmpFiles = conf.get(HADOOP_TMP_FILES, "");
     if (tmpFiles.length() > 0) { // already present?
-      tmpFiles = tmpFiles + ","; 
+      tmpFiles = tmpFiles + ",";
     }
     GenericOptionsParser parser = new GenericOptionsParser(
-        new Configuration(conf), 
-        new String[] { "--files", file.getCanonicalPath() });
+            new Configuration(conf),
+            new String[]{"--files", file.getCanonicalPath()});
     String additionalTmpFiles = parser.getConfiguration().get(HADOOP_TMP_FILES);
     assert additionalTmpFiles != null;
     assert additionalTmpFiles.length() > 0;
     tmpFiles += additionalTmpFiles;
     conf.set(HADOOP_TMP_FILES, tmpFiles);
   }
-  
+
   private MorphlineMapRunner setupMorphline(MapReduceIndexerToolArgumentParser.Options options) throws IOException, URISyntaxException {
     if (options.morphlineId != null) {
       job.getConfiguration().set(MorphlineMapRunner.MORPHLINE_ID_PARAM, options.morphlineId);
     }
-    addDistributedCacheFile(options.morphlineFile, job.getConfiguration());    
+    addDistributedCacheFile(options.morphlineFile, job.getConfiguration());
     if (!options.isDryRun) {
       return null;
     }
-    
+
     /*
      * Ensure scripting support for Java via morphline "java" command works even in dryRun mode,
      * i.e. when executed in the client side driver JVM. To do so, collect all classpath URLs from
@@ -471,7 +470,7 @@ public class MapReduceIndexerTool extends Configured implements Tool {
     String fullClassPath = "";
     ClassLoader loader = Thread.currentThread().getContextClassLoader(); // see org.apache.hadoop.util.RunJar
     while (loader != null) { // walk class loaders, collect all classpath URLs
-      if (loader instanceof URLClassLoader) { 
+      if (loader instanceof URLClassLoader) {
         URL[] classPathPartURLs = ((URLClassLoader) loader).getURLs(); // see org.apache.hadoop.util.RunJar
         LOG.trace("dryRun: classPathPartURLs: {}", Arrays.asList(classPathPartURLs));
         StringBuilder classPathParts = new StringBuilder();
@@ -491,7 +490,7 @@ public class MapReduceIndexerTool extends Configured implements Tool {
       }
       loader = loader.getParent();
     }
-    
+
     // tell FastJavaScriptEngine.parse() where to find the classes that the script might depend on
     if (fullClassPath.length() > 0) {
       assert System.getProperty("java.class.path") != null;
@@ -499,17 +498,17 @@ public class MapReduceIndexerTool extends Configured implements Tool {
       LOG.trace("dryRun: fullClassPath: {}", fullClassPath);
       System.setProperty("java.class.path", fullClassPath); // see FastJavaScriptEngine.parse()
     }
-    
+
     job.getConfiguration().set(MorphlineMapRunner.MORPHLINE_FILE_PARAM, options.morphlineFile.getPath());
     return new MorphlineMapRunner(
-        job.getConfiguration(), new DryRunDocumentLoader(), options.solrHomeDir.getPath());
+            job.getConfiguration(), new DryRunDocumentLoader(), options.solrHomeDir.getPath());
   }
-  
+
   /*
    * Executes the morphline in the current process (without submitting a job to MR) for quicker
    * turnaround during trial & debug sessions
    */
-  private void dryRun(MorphlineMapRunner runner, FileSystem fs, Path fullInputList) throws IOException {    
+  private void dryRun(MorphlineMapRunner runner, FileSystem fs, Path fullInputList) throws IOException {
     try (BufferedReader reader = new BufferedReader(new InputStreamReader(fs.open(fullInputList), StandardCharsets.UTF_8))) {
       String line;
       while ((line = reader.readLine()) != null) {
@@ -518,7 +517,5 @@ public class MapReduceIndexerTool extends Configured implements Tool {
       runner.cleanup();
     }
   }
-  
 
-  
 }

@@ -15,6 +15,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Locale;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -25,34 +26,38 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.input.NLineInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.solr.hadoop.MapReduceIndexerToolArgumentParser.Options;
+import org.apache.hadoop.util.Tool;
 import org.apache.solr.hadoop.util.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class TreeMergeRunner {
+public class IndexMergeTool extends Configured implements Tool {
 
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-
-  public TreeMergeRunner() {
+  private static final boolean isVerbose = true;
+  public IndexMergeTool() {
   }
 
-  public int run(Path outputReduceDir, Options options, Configuration conf) throws IOException, InterruptedException, ClassNotFoundException {
-    Path outputTreeMergeStep = new Path(options.outputDir, "mtree-merge-output");
-    FileSystem fs = options.outputDir.getFileSystem(conf);
+  public int merge(Path inputDir, Path outputDir, int targetShards, int fanout, Configuration conf) throws IOException, InterruptedException, ClassNotFoundException {
+    Path outputTreeMergeStep = new Path(outputDir, "mtree-merge-output");
+    
+    LOG.info("outputDir: {}", outputDir);
+    LOG.info("inputDir: {}", inputDir);
+    
+    FileSystem fs = outputDir.getFileSystem(conf);
    
 
     int mtreeMergeIterations = 0;
-    int reducers = options.reducers;
+    
+    int numInputShards = Utils.listSortedOutputShardDirs(inputDir, fs, Job.getInstance(conf)).length;
 
-    if (reducers > options.shards) {
-      mtreeMergeIterations = (int) Math.round(log(options.fanout, reducers / options.shards));
+    if (numInputShards > targetShards) {
+      mtreeMergeIterations = (int) Math.round(log(fanout, numInputShards / targetShards));
     }
     LOG.debug("MTree merge iterations to do: {}", mtreeMergeIterations);
     int mtreeMergeIteration = 1;
-    //conf.reloadConfiguration();
-    
-    while (reducers > options.shards) { // run a mtree merge iteration
+ 
+    while (numInputShards > targetShards) { // run a mtree merge iteration
       Instant startTime = Instant.now();
       Job mergeTreeJob = Job.getInstance(conf);
 
@@ -69,21 +74,21 @@ public class TreeMergeRunner {
       mergeTreeJob.setOutputValueClass(NullWritable.class);
       mergeTreeJob.setInputFormatClass(NLineInputFormat.class);
 
-      Path inputStepDir = new Path(options.outputDir, "mtree-merge-input-iteration" + mtreeMergeIteration);
+      Path inputStepDir = new Path(outputDir, "mtree-merge-input-iteration" + mtreeMergeIteration);
       Path fullInputList = new Path(inputStepDir, MapReduceIndexerTool.FULL_INPUT_LIST);
       LOG.debug("MTree merge iteration {}/{}: Creating input list file for mappers {}", new Object[]{mtreeMergeIteration, mtreeMergeIterations, fullInputList});
-      long numFiles = createTreeMergeInputDirList(outputReduceDir, fs, fullInputList, mergeTreeJob);
-      if (numFiles != reducers) {
-        throw new IllegalStateException("Not same reducers: " + reducers + ", numFiles: " + numFiles);
+      long numFiles = createTreeMergeInputDirList(inputDir, fs, fullInputList, mergeTreeJob);
+      if (numFiles != numInputShards) {
+        throw new IllegalStateException("Not same reducers: " + numInputShards + ", numFiles: " + numFiles);
       }
       NLineInputFormat.addInputPath(mergeTreeJob, fullInputList);
-      NLineInputFormat.setNumLinesPerSplit(mergeTreeJob, options.fanout);
+      NLineInputFormat.setNumLinesPerSplit(mergeTreeJob, fanout);
       FileOutputFormat.setOutputPath(mergeTreeJob, outputTreeMergeStep);
 
       LOG.info("MTree merge iteration {}/{}: Merging {} shards into {} shards using fanout {}", new Object[]{
-        mtreeMergeIteration, mtreeMergeIterations, reducers, (reducers / options.fanout), options.fanout});
+        mtreeMergeIteration, mtreeMergeIterations, numInputShards, (numInputShards / fanout), fanout});
    
-      if (!Utils.waitForCompletion(mergeTreeJob, options.isVerbose)) {
+      if (!Utils.waitForCompletion(mergeTreeJob, isVerbose)) {
         return -1; // job failed
       }
       if (!renameTreeMergeShardDirs(outputTreeMergeStep, mergeTreeJob, fs)) {
@@ -91,19 +96,19 @@ public class TreeMergeRunner {
       }
       Instant endTime = Instant.now();
       LOG.info("MTree merge iteration {}/{}: Done. Merging {} shards into {} shards using fanout {} took {}",
-              new Object[]{mtreeMergeIteration, mtreeMergeIterations, reducers, (reducers / options.fanout), options.fanout, Duration.between(startTime, endTime)});
+              new Object[]{mtreeMergeIteration, mtreeMergeIterations, numInputShards, (numInputShards / fanout), fanout, Duration.between(startTime, endTime)});
 
-      if (!Utils.delete(outputReduceDir, true, fs)) {
+      if (!Utils.delete(inputDir, true, fs)) {
         return -1;
       }
-      if (!Utils.rename(outputTreeMergeStep, outputReduceDir, fs)) {
+      if (!Utils.rename(outputTreeMergeStep, inputDir, fs)) {
         return -1;
       }
-      assert reducers % options.fanout == 0;
-      reducers = reducers / options.fanout;
+      assert numInputShards % fanout == 0;
+      numInputShards = numInputShards / fanout;
       mtreeMergeIteration++;
     }
-    assert reducers == options.shards;
+    assert numInputShards == targetShards;
     return mtreeMergeIterations;
   }
 
@@ -111,10 +116,10 @@ public class TreeMergeRunner {
     return Math.log(value) / Math.log(base);
   }
 
-  private int createTreeMergeInputDirList(Path outputReduceDir, FileSystem fs, Path fullInputList, Job job)
+  private int createTreeMergeInputDirList(Path inputDir, FileSystem fs, Path fullInputList, Job job)
           throws FileNotFoundException, IOException {
 
-    FileStatus[] dirs = Utils.listSortedOutputShardDirs(outputReduceDir, fs, job);
+    FileStatus[] dirs = Utils.listSortedOutputShardDirs(inputDir, fs, job);
     int numFiles = 0;
     FSDataOutputStream out = fs.create(fullInputList);
     try {
@@ -150,7 +155,7 @@ public class TreeMergeRunner {
    * completed, the job driver renames the output dirs such that the dir name contains the true solr
    * shard id, based on these auxiliary files.
    * 
-   * This way each doc gets assigned to the right Solr shard even with #reducers > #solrshards
+   * This way each doc gets assigned to the right Solr shard even with #numInputShards > #solrshards
    * 
    * Example for a merge with two shards:
    * 
@@ -160,7 +165,7 @@ public class TreeMergeRunner {
    * ... and so on
    * 
    * Also see run() method above where it uses NLineInputFormat.setNumLinesPerSplit(job,
-   * options.fanout)
+   * fanout)
    * 
    * Also see TreeMergeOutputFormat.TreeMergeRecordWriter.writeShardNumberFile()
    */
@@ -217,6 +222,11 @@ public class TreeMergeRunner {
       }
     }
     return true;
+  }
+
+  @Override
+  public int run(String[] strings) throws Exception {
+    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
   }
 
 }

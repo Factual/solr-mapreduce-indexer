@@ -55,7 +55,6 @@ import org.slf4j.LoggerFactory;
  */
 public class TreeMergeOutputFormat extends FileOutputFormat<Text, NullWritable> {
 
-  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   @Override
   public RecordWriter getRecordWriter(TaskAttemptContext context) throws IOException {
@@ -72,15 +71,14 @@ public class TreeMergeOutputFormat extends FileOutputFormat<Text, NullWritable> 
     private final Path workDir;
     private final List<Path> shards = new ArrayList();
     private final HeartBeater heartBeater;
-    private final TaskAttemptContext context;
-    private boolean closeCalledOnce;
+   
 
     private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
     public TreeMergeRecordWriter(TaskAttemptContext context, Path workDir) {
       this.workDir = new Path(workDir, "data/index");
       this.heartBeater = new HeartBeater(context);
-      this.context = context;
+      
 
       //without this setting, exceptions about the filesystem being closed will irredeemably rob you of hours of your life.  sad.
       context.getConfiguration().setBoolean("fs.hdfs.impl.disable.cache", true);
