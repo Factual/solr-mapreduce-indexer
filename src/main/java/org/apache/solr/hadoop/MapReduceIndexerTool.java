@@ -54,10 +54,11 @@ import org.apache.hadoop.util.GenericOptionsParser;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.solr.common.cloud.SolrZkClient;
-import org.apache.solr.hadoop.morphline.MorphlineMapRunner;
-import org.apache.solr.hadoop.morphline.MorphlineMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.factual.audience.schema.DeviceData;
+import com.factual.parquet.hadoop.thrift.ParquetThriftInputFormat;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -149,6 +150,8 @@ public class MapReduceIndexerTool extends Configured implements Tool {
     }
     Path outputResultsDir = new Path(options.outputDir, RESULTS_DIR);
     Path outputReduceDir = new Path(options.outputDir, "reducers");
+    
+    /*
     Path outputStep1Dir = new Path(options.outputDir, "tmp1");
     Path outputStep2Dir = new Path(options.outputDir, "tmp2");
 
@@ -173,6 +176,9 @@ public class MapReduceIndexerTool extends Configured implements Tool {
             + "numFiles: {}, mappers: {}, realMappers: {}, reducers: {}, shards: {}, fanout: {}, maxSegments: {}",
             new Object[]{numFiles, mappers, realMappers, reducers, options.shards, options.fanout, options.maxSegments});
 
+  */
+    
+    /*
     LOG.info("Randomizing list of {} input files to spread indexing load more evenly among mappers", numFiles);
     Instant startTime = Instant.now();
     int maxFilesToRandomizeInMemory = job.getConfiguration().getInt(MAIN_MEMORY_RANDOMIZATION_THRESHOLD, MAX_FILES_TO_RANDOMIZE_IN_MEMORY);
@@ -196,14 +202,33 @@ public class MapReduceIndexerTool extends Configured implements Tool {
     job.setInputFormatClass(NLineInputFormat.class);
     NLineInputFormat.addInputPath(job, outputStep2Dir);
     NLineInputFormat.setNumLinesPerSplit(job, numLinesPerSplit);
+
+    */
+    
+    int reducers = 100;
+    int numFiles = 1;
+    int realMappers = 100;
+    
+    Instant startTime = Instant.now();
+    Instant endTime = Instant.now();
+
+    job.setInputFormatClass(ParquetThriftInputFormat.class);
+    for (Path path : options.inputLists) {
+      ParquetThriftInputFormat.addInputPath(job, path);
+    }
+    ParquetThriftInputFormat.setThriftClass(job.getConfiguration(), DeviceData.class);
+    
     FileOutputFormat.setOutputPath(job, outputReduceDir);
 
+    
     String mapperClass = job.getConfiguration().get(JobContext.MAP_CLASS_ATTR);
+    /*
     if (mapperClass == null) { // enable customization
       Class clazz = MorphlineMapper.class;
       mapperClass = clazz.getName();
       job.setMapperClass(clazz);
     }
+    */
     job.setJobName(getClass().getName() + "/" + Utils.getShortClassName(mapperClass));
 
     if (job.getConfiguration().get(JobContext.REDUCE_CLASS_ATTR) == null) { // enable customization
@@ -250,7 +275,9 @@ public class MapReduceIndexerTool extends Configured implements Tool {
       }
     }
 
-    MorphlineMapRunner runner = setupMorphline(options);
+    //MorphlineMapRunner runner = setupMorphline(options);
+    
+    /*
     if (options.isDryRun && runner != null) {
       LOG.info("Indexing {} files in dryrun mode", numFiles);
       startTime = Instant.now();
@@ -260,7 +287,8 @@ public class MapReduceIndexerTool extends Configured implements Tool {
       Utils.goodbye(null, programStart);
       return 0;
     }
-    job.getConfiguration().set(MorphlineMapRunner.MORPHLINE_FILE_PARAM, options.morphlineFile.getName());
+    */
+    //job.getConfiguration().set(MorphlineMapRunner.MORPHLINE_FILE_PARAM, options.morphlineFile.getName());
 
     job.setNumReduceTasks(reducers);
     job.setOutputKeyClass(Text.class);
@@ -431,7 +459,7 @@ public class MapReduceIndexerTool extends Configured implements Tool {
     tmpFiles += additionalTmpFiles;
     conf.set(HADOOP_TMP_FILES, tmpFiles);
   }
-
+/*
   private MorphlineMapRunner setupMorphline(MapReduceIndexerToolArgumentParser.Options options) throws IOException, URISyntaxException {
     if (options.morphlineId != null) {
       job.getConfiguration().set(MorphlineMapRunner.MORPHLINE_ID_PARAM, options.morphlineId);
@@ -440,7 +468,7 @@ public class MapReduceIndexerTool extends Configured implements Tool {
     if (!options.isDryRun) {
       return null;
     }
-
+*/
     /*
      * Ensure scripting support for Java via morphline "java" command works even in dryRun mode,
      * i.e. when executed in the client side driver JVM. To do so, collect all classpath URLs from
@@ -453,6 +481,7 @@ public class MapReduceIndexerTool extends Configured implements Tool {
      * ... caused by compilation failed: mfm:///MyJavaClass1.java:2: package
      * org.kitesdk.morphline.api does not exist
      */
+  /*
     LOG.trace("dryRun: java.class.path: {}", System.getProperty("java.class.path"));
     String fullClassPath = "";
     ClassLoader loader = Thread.currentThread().getContextClassLoader(); // see org.apache.hadoop.util.RunJar
@@ -490,11 +519,13 @@ public class MapReduceIndexerTool extends Configured implements Tool {
     return new MorphlineMapRunner(
             job.getConfiguration(), new DryRunDocumentLoader(), options.solrHomeDir.getPath());
   }
+    */
 
   /*
    * Executes the morphline in the current process (without submitting a job to MR) for quicker
    * turnaround during trial & debug sessions
    */
+  /*
   private void dryRun(MorphlineMapRunner runner, FileSystem fs, Path fullInputList) throws IOException {
     try (BufferedReader reader = new BufferedReader(new InputStreamReader(fs.open(fullInputList), StandardCharsets.UTF_8))) {
       String line;
@@ -504,6 +535,7 @@ public class MapReduceIndexerTool extends Configured implements Tool {
       runner.cleanup();
     }
   }
+  */
 
   private boolean renameIntermediateFiles(FileSystem fs, Path path, String dirPrefix) throws IOException {
     // normalize output shard dir prefix, i.e.
