@@ -27,6 +27,7 @@ import net.sourceforge.argparse4j.inf.Namespace;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.solr.hadoop.dedup.RetainMostRecentUpdateConflictResolver;
+import org.apache.solr.hadoop.morphline.MorphlineMapRunner;
 import org.kitesdk.morphline.base.Fields;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,7 +84,7 @@ public final class MapReduceIndexerToolArgumentParser {
                     + "Any kind of data format can be indexed and any Solr documents for any kind of Solr schema can be generated, "
                     + "and any custom ETL logic can be registered and executed.\n"
                     + "Record fields, including MIME types, can also explicitly be passed by force from the CLI to the morphline, for example: "
-                    + "hadoop ... -D "  + Fields.ATTACHMENT_MIME_TYPE + "=text/csv"
+                    + "hadoop ... -D " + MorphlineMapRunner.MORPHLINE_FIELD_PREFIX + Fields.ATTACHMENT_MIME_TYPE + "=text/csv"
                     + "\n\n"
                     + "3) Reducer phase: This (parallel) phase loads the mapper's SolrInputDocuments into one EmbeddedSolrServer per reducer. "
                     + "Each such reducer and Solr server can be seen as a (micro) shard. The Solr servers store their "
@@ -192,7 +193,7 @@ public final class MapReduceIndexerToolArgumentParser {
     Argument morphlineFileArg = requiredGroup.addArgument("--morphline-file")
             .metavar("FILE")
             .type(new FileArgumentType().verifyExists().verifyIsFile().verifyCanRead())
-            .required(true)
+            .required(false)
             .help("Relative or absolute path to a local config file that contains one or more morphlines. "
                     + "The file must be UTF-8 encoded. Example: /path/to/morphline.conf");
 
@@ -484,11 +485,11 @@ public final class MapReduceIndexerToolArgumentParser {
     String zkHost;
     Integer goLiveThreads;
     List<List<String>> shardUrls;
-    List<Path> inputLists;
+    public List<Path> inputLists;
     List<Path> inputFiles;
-    Path outputDir;
-    int mappers;
-    int reducers;
+    public Path outputDir;
+    public int mappers;
+    public int reducers;
     String updateConflictResolver;
     int fanout;
     Integer shards;

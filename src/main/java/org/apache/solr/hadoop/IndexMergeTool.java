@@ -78,7 +78,8 @@ public class IndexMergeTool extends Configured implements Tool {
             mergeTreeJob.setInputFormatClass(NLineInputFormat.class);
 
             Path inputStepDir = new Path(outputDir, "mtree-merge-input-iteration" + mtreeMergeIteration);
-            Path fullInputList = new Path(inputStepDir, MapReduceIndexerTool.FULL_INPUT_LIST);
+            // TODO: figure out if this works without morphlines
+            Path fullInputList = new Path(inputStepDir, MorphlineWorkflow.FULL_INPUT_LIST);
             LOG.debug("MTree merge iteration {}/{}: Creating input list file for mappers {}", new Object[]{mtreeMergeIteration, mtreeMergeIterations, fullInputList});
             long numFiles = createTreeMergeInputDirList(inputDir, fs, fullInputList, mergeTreeJob);
             if (numFiles != numInputShards) {

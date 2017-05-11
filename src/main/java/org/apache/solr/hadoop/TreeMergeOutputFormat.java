@@ -18,8 +18,6 @@ package org.apache.solr.hadoop;
 
 import org.apache.solr.hadoop.util.HeartBeater;
 import org.apache.solr.hadoop.util.Utils;
-import org.apache.solr.store.hdfs.HdfsDirectory;
-
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
@@ -46,6 +44,7 @@ import org.apache.lucene.index.MergePolicy;
 import org.apache.lucene.index.TieredMergePolicy;
 import org.apache.lucene.misc.IndexMergeTool;
 import org.apache.lucene.store.Directory;
+import org.apache.solr.store.hdfs.HdfsDirectory;
 import org.apache.solr.update.SolrIndexWriter;
 import org.apache.solr.util.RTimer;
 import org.slf4j.Logger;

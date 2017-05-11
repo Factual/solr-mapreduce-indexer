@@ -50,7 +50,8 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.solr.common.util.SuppressForbidden;
 import org.apache.solr.hadoop.MapReduceIndexerTool;
-import static org.apache.solr.hadoop.MapReduceIndexerTool.FULL_INPUT_LIST;
+import org.apache.solr.hadoop.MorphlineWorkflow;
+
 import org.apache.solr.hadoop.SolrOutputFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -163,7 +164,8 @@ public final class Utils {
     
     Collections.shuffle(lines, new Random(421439783L)); // constant seed for reproducability
     
-    FSDataOutputStream out = fs.create(new Path(outputStep2Dir, FULL_INPUT_LIST));
+    // TODO: figure out if this depends on a morphline workflow
+    FSDataOutputStream out = fs.create(new Path(outputStep2Dir, MorphlineWorkflow.FULL_INPUT_LIST));
     try (Writer writer = new BufferedWriter(new OutputStreamWriter(out, StandardCharsets.UTF_8))) {
       for (String line : lines) {
         writer.write(line + "\n");
