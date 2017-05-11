@@ -36,6 +36,7 @@ import org.apache.hadoop.util.GenericOptionsParser;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.solr.common.cloud.SolrZkClient;
+import org.apache.solr.hadoop.MapReduceIndexerToolArgumentParser.Options;
 import org.apache.solr.hadoop.morphline.MorphlineMapper;
 import org.apache.solr.hadoop.util.Utils;
 import org.apache.solr.hadoop.util.ZooKeeperInspector;
@@ -49,7 +50,7 @@ import org.slf4j.LoggerFactory;
  * output shards into a set of live customer facing Solr servers, typically a
  * SolrCloud.
  */
-public class MapReduceIndexerTool extends Configured implements Tool {
+public abstract class MapReduceIndexerTool extends Configured implements Tool {
 
   public static final String RESULTS_DIR = "results";
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -62,7 +63,7 @@ public class MapReduceIndexerTool extends Configured implements Tool {
    * @throws java.lang.Exception
    */
   public static void main(String[] args) throws Exception {
-    int res = ToolRunner.run(new Configuration(), new MapReduceIndexerTool(), args);
+    int res = ToolRunner.run(new Configuration(), new MorphlineEnabledIndexerTool(), args);
     System.exit(res);
   }
 
@@ -76,14 +77,14 @@ public class MapReduceIndexerTool extends Configured implements Tool {
     if (exitCode != null) {
       return exitCode;
     }
-    return run(opts, new MorphlineWorkflow());
+    return run(opts);
   }
 
   /**
    * API for Java clients; visible for testing; may become a public API
    * eventually
    */
-  public int run(MapReduceIndexerToolArgumentParser.Options options, IWorkflow workflow) throws Exception {
+  public int run(MapReduceIndexerToolArgumentParser.Options options) throws Exception {
 
     Instant programStart = Instant.now();
     
@@ -111,7 +112,7 @@ public class MapReduceIndexerTool extends Configured implements Tool {
     Path outputResultsDir = new Path(options.outputDir, RESULTS_DIR);
     Path outputReduceDir = new Path(options.outputDir, "reducers");
 
-    int setupResult = workflow.setupIndexing(job, options);
+    int setupResult = setupIndexing(job, options);
     if (setupResult <= 0) {
       return setupResult;
     }
@@ -170,7 +171,7 @@ public class MapReduceIndexerTool extends Configured implements Tool {
       }
     }
 
-    workflow.attemptDryRun(job, options, programStart);
+    attemptDryRun(job, options, programStart);
 
     job.setNumReduceTasks(options.reducers);
     job.setOutputKeyClass(Text.class);
@@ -190,7 +191,7 @@ public class MapReduceIndexerTool extends Configured implements Tool {
     }
 
     Instant endTime = Instant.now();
-    workflow.reportIndexingDone(options, Duration.between(startTime, endTime));
+    reportIndexingDone(options, Duration.between(startTime, endTime));
 
     if (options.reducers > options.shards) {
       LOG.info("The number of reducers is greater than the number of shards.  Invoking the tree merge process");
@@ -216,6 +217,12 @@ public class MapReduceIndexerTool extends Configured implements Tool {
     Utils.goodbye(job, programStart);
     return 0;
   }
+  
+  public abstract int setupIndexing(Job job, Options options) throws Exception;
+
+  public abstract void attemptDryRun(Job job, Options options, Instant programStart) throws Exception;
+
+  public abstract void reportIndexingDone(Options options, Duration timeSpent);
 
   // do the same as if the user had typed 'hadoop ... --files <file>' 
   public static void addDistributedCacheFile(File file, Configuration conf) throws IOException {

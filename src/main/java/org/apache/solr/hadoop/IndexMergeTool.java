@@ -79,7 +79,7 @@ public class IndexMergeTool extends Configured implements Tool {
 
             Path inputStepDir = new Path(outputDir, "mtree-merge-input-iteration" + mtreeMergeIteration);
             // TODO: figure out if this works without morphlines
-            Path fullInputList = new Path(inputStepDir, MorphlineWorkflow.FULL_INPUT_LIST);
+            Path fullInputList = new Path(inputStepDir, MorphlineEnabledIndexerTool.FULL_INPUT_LIST);
             LOG.debug("MTree merge iteration {}/{}: Creating input list file for mappers {}", new Object[]{mtreeMergeIteration, mtreeMergeIterations, fullInputList});
             long numFiles = createTreeMergeInputDirList(inputDir, fs, fullInputList, mergeTreeJob);
             if (numFiles != numInputShards) {

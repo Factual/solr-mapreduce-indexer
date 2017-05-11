@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
 
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 
-public class MorphlineWorkflow implements IWorkflow {
+public class MorphlineEnabledIndexerTool extends MapReduceIndexerTool {
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   public static final String FULL_INPUT_LIST = "full-input-list.txt";
   static final int MAX_FILES_TO_RANDOMIZE_IN_MEMORY = 10000000;
