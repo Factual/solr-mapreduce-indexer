@@ -1,21 +1,6 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package org.apache.solr.hadoop;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
@@ -31,27 +16,56 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.util.Tool;
+import org.apache.hadoop.util.ToolRunner;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.request.CoreAdminRequest;
 import org.apache.solr.common.util.ExecutorUtil;
-import org.apache.solr.hadoop.MapReduceIndexerToolArgumentParser.Options;
+import org.apache.solr.hadoop.GoLiveToolArgumentParser.GoLiveOptions;
+import org.apache.solr.hadoop.util.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * The optional (parallel) GoLive phase merges the output shards of the previous
- * phase into a set of live customer facing Solr servers, typically a SolrCloud.
- */
-class GoLive {
+public class GoLiveTool extends Configured implements Tool {
 
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-  
+
+  public static void main(String[] args) throws Exception {
+    int res = ToolRunner.run(new Configuration(), new GoLiveTool(), args);
+    System.exit(res);
+  }
+
+  @Override
+  public int run(String[] args) throws Exception {
+    GoLiveOptions options = new GoLiveOptions();
+    Integer exitCode = new GoLiveToolArgumentParser().parseArgs(args, getConf(), options);
+    if (exitCode != null) {
+      return exitCode;
+    }
+
+    GoLiveToolArgumentParser.verifyGoLiveArgs(options, null);
+    options.zkOptions.verifyZKStructure(null);
+    // auto update shard count
+    if (options.zkOptions.zkHost != null) {
+      options.shards = options.zkOptions.shardUrls.size();
+    }
+    
+    if (!goLive(getConf(), options)) {
+      return -1;
+    }
+    return 0;
+  }
+
   // TODO: handle clusters with replicas
   // @bfs: This expects the same number of shards as there are shards on the server, otherwise, it just fails.
-  public boolean goLive(Options options, FileStatus[] outDirs) {
+  public boolean goLive(Configuration conf, GoLiveOptions options) throws FileNotFoundException, IOException {
+    FileStatus[] outDirs = Utils.listSortedOutputShardDirs(conf, options.inputDir);
+    
     LOG.info("Live merging of output shards into Solr cluster...");
     boolean success = false;
     long start = System.nanoTime();
@@ -69,7 +83,7 @@ class GoLive {
         LOG.debug("processing: " + dir.getPath());
 
         cnt++;
-        List<String> urls = options.shardUrls.get(cnt);
+        List<String> urls = options.zkOptions.shardUrls.get(cnt);
         
         for (String url : urls) {
           
@@ -138,13 +152,13 @@ class GoLive {
       
       try {
         LOG.info("Committing live merge...");
-        if (options.zkHost != null) {
-          try (CloudSolrClient server = new CloudSolrClient.Builder().withZkHost(options.zkHost).build()) {
-            server.setDefaultCollection(options.collection);
+        if (options.zkOptions.zkHost != null) {
+          try (CloudSolrClient server = new CloudSolrClient.Builder().withZkHost(options.zkOptions.zkHost).build()) {
+            server.setDefaultCollection(options.zkOptions.collection);
             server.commit();
           }
         } else {
-          for (List<String> urls : options.shardUrls) {
+          for (List<String> urls : options.zkOptions.shardUrls) {
             for (String url : urls) {
               // TODO: we should do these concurrently
               try (HttpSolrClient server = new HttpSolrClient.Builder(url).build()) {
@@ -179,5 +193,4 @@ class GoLive {
     Exception e;
     boolean success = false;
   }
-
 }

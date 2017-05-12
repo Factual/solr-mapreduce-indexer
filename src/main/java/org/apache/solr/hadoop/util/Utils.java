@@ -136,10 +136,11 @@ public final class Utils {
     return result;
   }
 
-  public static FileStatus[] listSortedOutputShardDirs(Path outputReduceDir, FileSystem fs, Job job) throws FileNotFoundException,
+  public static FileStatus[] listSortedOutputShardDirs(Configuration conf, Path outputReduceDir) throws FileNotFoundException,
           IOException {
-
-    final String dirPrefix = SolrOutputFormat.getOutputName(job);
+    
+    FileSystem fs = outputReduceDir.getFileSystem(conf);
+    final String dirPrefix = SolrOutputFormat.getOutputName(Job.getInstance(conf)); // note this is normally just "part";
     FileStatus[] dirs = fs.listStatus(outputReduceDir, (Path path) -> path.getName().startsWith(dirPrefix));
     for (FileStatus dir : dirs) {
       if (!dir.isDirectory()) {

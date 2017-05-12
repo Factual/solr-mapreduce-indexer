@@ -28,29 +28,30 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.lib.input.NLineInputFormat;
 import org.apache.solr.hadoop.MapReduceIndexerToolArgumentParser.Options;
 import org.apache.solr.hadoop.morphline.MorphlineMapRunner;
+import org.apache.solr.hadoop.morphline.MorphlineMapper;
 import org.apache.solr.hadoop.util.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 
-public class MorphlineEnabledIndexerTool extends MapReduceIndexerTool {
+public class MorphlineEnabledIndexerTool extends IndexTool {
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   public static final String FULL_INPUT_LIST = "full-input-list.txt";
   static final int MAX_FILES_TO_RANDOMIZE_IN_MEMORY = 10000000;
   static final String MAIN_MEMORY_RANDOMIZATION_THRESHOLD = MapReduceIndexerTool.class.getName() + ".mainMemoryRandomizationThreshold";
 
   private long numFiles;
-  private FileSystem fs;
   private Path fullInputList;
   private int realMappers;
   
   @Override
   public int setupIndexing(Job job, Options options) throws Exception {
-    fs = options.outputDir.getFileSystem(job.getConfiguration());
+    FileSystem fs = options.outputDir.getFileSystem(job.getConfiguration());
 
     if (options.morphlineFile == null) {
       throw new ArgumentParserException("Argument --morphline-file is required", null);
@@ -87,7 +88,7 @@ public class MorphlineEnabledIndexerTool extends MapReduceIndexerTool {
     numLinesPerSplit = Math.max(1, numLinesPerSplit);
 
     realMappers = Math.min(mappers, (int) Utils.ceilDivide(numFiles, numLinesPerSplit));
-    MapReduceIndexerTool.calculateNumReducers(job, options, realMappers);
+    IndexTool.calculateNumReducers(job, options, realMappers);
     job.getConfiguration().set(MorphlineMapRunner.MORPHLINE_FILE_PARAM, options.morphlineFile.getName());
 
     int reducers = options.reducers;
@@ -121,6 +122,14 @@ public class MorphlineEnabledIndexerTool extends MapReduceIndexerTool {
 
     LOG.info("Indexing {} files using {} real mappers into {} reducers", new Object[]{numFiles, realMappers, reducers});
     
+    String mapperClass = job.getConfiguration().get(JobContext.MAP_CLASS_ATTR);
+    if (mapperClass == null) { // enable customization
+      Class clazz = MorphlineMapper.class;
+      mapperClass = clazz.getName();
+      job.setMapperClass(clazz);
+    }
+    job.setJobName(getClass().getName() + "/" + Utils.getShortClassName(mapperClass));
+
     // continue
     return 1;
     
@@ -128,6 +137,8 @@ public class MorphlineEnabledIndexerTool extends MapReduceIndexerTool {
 
   @Override
   public void attemptDryRun(Job job, Options options, Instant programStart) throws Exception {
+    FileSystem fs = options.outputDir.getFileSystem(job.getConfiguration());
+
     MorphlineMapRunner runner = setupMorphline(job, options);
     
     if (options.isDryRun && runner != null) {
@@ -179,11 +190,6 @@ public class MorphlineEnabledIndexerTool extends MapReduceIndexerTool {
     }
     return numFiles;
   }
-  
-  @Override
-  public void reportIndexingDone(Options options, Duration timeSpent) {
-    LOG.info("Done. Indexing {} files using {} real mappers into {} reducers took {}", new Object[]{numFiles, realMappers, options.reducers, timeSpent});
-  }
 
   /**
    * Add the specified file to the input set, if path is a directory then add
@@ -207,7 +213,7 @@ public class MorphlineEnabledIndexerTool extends MapReduceIndexerTool {
     if (options.morphlineId != null) {
       job.getConfiguration().set(MorphlineMapRunner.MORPHLINE_ID_PARAM, options.morphlineId);
     }
-    MapReduceIndexerTool.addDistributedCacheFile(options.morphlineFile, job.getConfiguration());
+    IndexTool.addDistributedCacheFile(options.morphlineFile, job.getConfiguration());
     if (!options.isDryRun) {
       return null;
     }
