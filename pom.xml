@@ -42,6 +42,12 @@
             <artifactId>kite-morphlines-solr-core</artifactId>
             <version>1.1.0</version>
             <type>jar</type>
+            <exclusions>
+              <exclusion>
+                <groupId>org.apache.solr</groupId>
+                <artifactId>solr-core</artifactId>
+              </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.kitesdk</groupId>
@@ -143,6 +149,14 @@
             <version>6.4.2</version>
             <type>jar</type>
             <exclusions>
+                <exclusion>
+                    <groupId>org.apache.solr</groupId>
+                    <artifactId>solr-solrj</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.solr</groupId>
+                    <artifactId>solr-core</artifactId>
+                </exclusion>
                 <exclusion>
                     <groupId>org.apache.httpcomponents</groupId>
                     <artifactId>httpclient</artifactId>
