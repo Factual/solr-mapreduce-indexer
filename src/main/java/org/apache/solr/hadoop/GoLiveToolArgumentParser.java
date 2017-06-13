@@ -36,6 +36,7 @@ public class GoLiveToolArgumentParser {
     public Path inputDir;
     public Integer shards;
     public ZookeeperOptions zkOptions;
+    public Integer maxShards;
     
     public GoLiveOptions() {
     }

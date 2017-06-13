@@ -41,7 +41,8 @@ import org.apache.solr.hadoop.IndexMergeToolArgumentParser.IndexMergeOptions;
  * SolrCloud.
  */
 public abstract class MapReduceIndexerTool extends Configured implements Tool {
-
+  
+  public static final String REDUCERS_DIR = "reducers";
   public static final String RESULTS_DIR = "results";
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -82,7 +83,7 @@ public abstract class MapReduceIndexerTool extends Configured implements Tool {
     }
 
     FileSystem fs = options.outputDir.getFileSystem(getConf());
-    Path outputReduceDir = new Path(options.outputDir, IndexTool.REDUCERS_DIR);
+    Path outputReduceDir = new Path(options.outputDir, REDUCERS_DIR);
     Path outputResultsDir = new Path(options.outputDir, RESULTS_DIR);
 
     // attempt merge

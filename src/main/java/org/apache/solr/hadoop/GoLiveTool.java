@@ -24,6 +24,7 @@ import org.apache.hadoop.util.ToolRunner;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
+import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.client.solrj.request.CoreAdminRequest;
 import org.apache.solr.common.util.ExecutorUtil;
 import org.apache.solr.hadoop.GoLiveToolArgumentParser.GoLiveOptions;
@@ -47,7 +48,7 @@ public class GoLiveTool extends Configured implements Tool {
     if (exitCode != null) {
       return exitCode;
     }
-
+    
     GoLiveToolArgumentParser.verifyGoLiveArgs(options, null);
     options.zkOptions.verifyZKStructure(null);
     // auto update shard count
@@ -66,6 +67,8 @@ public class GoLiveTool extends Configured implements Tool {
   public boolean goLive(Configuration conf, GoLiveOptions options) throws FileNotFoundException, IOException {
     FileStatus[] outDirs = Utils.listSortedOutputShardDirs(conf, options.inputDir);
     
+    Integer maxShards = options.maxShards;
+    
     LOG.info("Live merging of output shards into Solr cluster...");
     boolean success = false;
     long start = System.nanoTime();
@@ -78,8 +81,11 @@ public class GoLiveTool extends Configured implements Tool {
       CompletionService<Request> completionService = new ExecutorCompletionService<>(executor);
       Set<Future<Request>> pending = new HashSet<>();
       int cnt = -1;
-      for (final FileStatus dir : outDirs) {
-        
+      for (int i=0;i<outDirs.length;i++) {
+        if (maxShards != null && i >= maxShards) {
+          break;
+        }
+        final FileStatus dir = outDirs[i];
         LOG.debug("processing: " + dir.getPath());
 
         cnt++;

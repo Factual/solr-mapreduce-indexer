@@ -44,7 +44,6 @@ import com.google.common.io.Files;
 public abstract class IndexTool extends Configured implements Tool {
 
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-  public static final String REDUCERS_DIR = "reducers";
 
   /**
    * API for command line clients
@@ -107,7 +106,7 @@ public abstract class IndexTool extends Configured implements Tool {
       return -1;
     }
     
-    Path outputReduceDir = new Path(options.outputDir, REDUCERS_DIR);
+    Path outputReduceDir = options.outputDir;
 
     int setupResult = setupIndexing(job, options);
     if (setupResult <= 0) {
