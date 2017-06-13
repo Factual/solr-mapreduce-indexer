@@ -30,10 +30,12 @@ import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.lib.input.NLineInputFormat;
+import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.hadoop.MapReduceIndexerToolArgumentParser.Options;
 import org.apache.solr.hadoop.morphline.MorphlineMapRunner;
 import org.apache.solr.hadoop.morphline.MorphlineMapper;
 import org.apache.solr.hadoop.util.Utils;
+import org.apache.solr.hadoop.util.ZooKeeperInspector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -130,6 +132,48 @@ public class MorphlineEnabledIndexerTool extends IndexTool {
     }
     job.setJobName(getClass().getName() + "/" + Utils.getShortClassName(mapperClass));
 
+    job.setOutputFormatClass(SolrOutputFormat.class);
+    
+    if (job.getConfiguration().get(JobContext.REDUCE_CLASS_ATTR) == null) { // enable customization
+      job.setReducerClass(SolrReducer.class);
+    }
+    
+    /*
+     * MapReduce partitioner that partitions the Mapper output such that each
+     * SolrInputDocument gets sent to the SolrCloud shard that it would have
+     * been sent to if the document were ingested via the standard SolrCloud
+     * Near Real Time (NRT) API.
+     * 
+     * In other words, this class implements the same partitioning semantics
+     * as the standard SolrCloud NRT API. This enables to mix batch updates
+     * from MapReduce ingestion with updates from standard NRT ingestion on
+     * the same SolrCloud cluster, using identical unique document keys.
+     */
+    if (job.getConfiguration().get(JobContext.PARTITIONER_CLASS_ATTR) == null) { // enable customization
+      job.setPartitionerClass(SolrCloudPartitioner.class);
+    }
+    
+    if (options.zkOptions.zkHost != null) {
+      assert options.zkOptions.collection != null;
+      job.getConfiguration().set(SolrCloudPartitioner.ZKHOST, options.zkOptions.zkHost);
+      job.getConfiguration().set(SolrCloudPartitioner.COLLECTION, options.zkOptions.collection);
+    }
+    job.getConfiguration().setInt(SolrCloudPartitioner.SHARDS, options.shards);
+
+    if (options.solrHomeDir != null) {
+      SolrOutputFormat.setupSolrHomeCache(null, options.solrHomeDir, job);
+    } else {
+      assert options.zkOptions.zkHost != null;
+      // use the config that this collection uses for the SolrHomeCache.
+      ZooKeeperInspector zki = new ZooKeeperInspector();
+      try (SolrZkClient zkClient = zki.getZkClient(options.zkOptions.zkHost)) {
+        String configName = zki.readConfigName(zkClient, options.zkOptions.collection);
+        File tmpSolrHomeDir = zki.downloadConfigDir(zkClient, configName);
+        SolrOutputFormat.setupSolrHomeCache(null, tmpSolrHomeDir, job);
+        options.solrHomeDir = tmpSolrHomeDir;
+      }
+    }
+    
     // continue
     return 1;
     

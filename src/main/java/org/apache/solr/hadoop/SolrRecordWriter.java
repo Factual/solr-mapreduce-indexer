@@ -51,7 +51,7 @@ import org.apache.solr.core.SolrResourceLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
+public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
 
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -107,6 +107,8 @@ class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
     this.batchSize = batchSize;
     this.batch = new ArrayList<>(batchSize);
     Configuration conf = context.getConfiguration();
+    
+    String outputId = outputShardDir.getParent().getName();
 
     // setLogLevel("org.apache.solr.core", "WARN");
     // setLogLevel("org.apache.solr.update", "WARN");
@@ -114,7 +116,7 @@ class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
     try {
       heartBeater.needHeartBeat();
 
-      Path solrHomeDir = SolrRecordWriter.findSolrConfig(conf);
+      Path solrHomeDir = SolrRecordWriter.findSolrConfig(conf, outputId);
       FileSystem fs = outputShardDir.getFileSystem(conf);
       EmbeddedSolrServer solr = createEmbeddedSolrServer(solrHomeDir, fs, outputShardDir);
       batchWriter = new BatchWriter(solr, batchSize,
@@ -186,14 +188,21 @@ class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
     contextMap.put(taskID, context);
   }
 
-  public static Path findSolrConfig(Configuration conf) throws IOException {
+  public static Path findSolrConfig(Configuration conf, String outputId) throws IOException {
     // FIXME when mrunit supports the new cache apis
     //URI[] localArchives = context.getCacheArchives();
     Path[] localArchives = DistributedCache.getLocalCacheArchives(conf);
     for (Path unpackedDir : localArchives) {
-      if (unpackedDir.getName().equals(SolrOutputFormat.getZipName(conf))) {
-        LOG.info("Using this unpacked directory as solr home: {}", unpackedDir);
-        return unpackedDir;
+      if (outputId == null) {
+        if (unpackedDir.getName().equals(SolrOutputFormat.getZipName(conf))) {
+          LOG.info("Using this unpacked directory as solr home: {}", unpackedDir);
+          return unpackedDir;
+        }
+      } else {
+        if (unpackedDir.getName().split("\\.", 2)[0].equals(outputId)) {
+          LOG.info("Using this unpacked directory as solr home: {}", unpackedDir);
+          return unpackedDir;
+        }
       }
     }
     throw new IOException(String.format(Locale.ENGLISH,

@@ -1,18 +1,24 @@
 package org.apache.solr.hadoop;
 
 
-import org.apache.solr.hadoop.util.PathArgumentType;
-import com.google.common.collect.Lists;
-import org.apache.solr.hadoop.util.Utils;
-import org.apache.solr.hadoop.util.ToolRunnerHelpFormatter;
-import org.apache.solr.hadoop.util.ZooKeeperInspector;
 import java.io.File;
 import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.solr.hadoop.dedup.RetainMostRecentUpdateConflictResolver;
+import org.apache.solr.hadoop.morphline.MorphlineMapRunner;
+import org.apache.solr.hadoop.util.PathArgumentType;
+import org.apache.solr.hadoop.util.ToolRunnerHelpFormatter;
+import org.apache.solr.hadoop.util.Utils;
+import org.kitesdk.morphline.base.Fields;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.impl.Arguments;
 import net.sourceforge.argparse4j.impl.action.HelpArgumentAction;
@@ -24,13 +30,6 @@ import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.FeatureControl;
 import net.sourceforge.argparse4j.inf.Namespace;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.Path;
-import org.apache.solr.hadoop.dedup.RetainMostRecentUpdateConflictResolver;
-import org.apache.solr.hadoop.morphline.MorphlineMapRunner;
-import org.kitesdk.morphline.base.Fields;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public final class MapReduceIndexerToolArgumentParser {
@@ -481,7 +480,7 @@ public final class MapReduceIndexerToolArgumentParser {
     int maxSegments;
     File morphlineFile;
     String morphlineId;
-    File solrHomeDir;
+    public File solrHomeDir;
     String fairSchedulerPool;
     boolean isDryRun;
     File log4jConfigFile;

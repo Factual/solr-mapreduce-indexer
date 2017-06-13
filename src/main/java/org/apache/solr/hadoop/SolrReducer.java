@@ -82,7 +82,7 @@ public class SolrReducer extends Reducer<Text, SolrInputDocumentWritable, Text, 
     heartBeater.needHeartBeat();
     try {
       values = resolve(key, values, context);
-      super.reduce(key, values, context);
+      writeDocument(key, values, context);
     } catch (IOException | InterruptedException e) {
       LOG.error("Unable to process key " + key, e);
       context.getCounter(getClass().getName() + ".errors", e.getClass().getName()).increment(1);
@@ -90,6 +90,12 @@ public class SolrReducer extends Reducer<Text, SolrInputDocumentWritable, Text, 
     } finally {
       heartBeater.cancelHeartBeat();
     }
+  }
+
+  protected void writeDocument(Text key,
+      Iterable<SolrInputDocumentWritable> values,
+      Reducer<Text, SolrInputDocumentWritable, Text, SolrInputDocumentWritable>.Context context) throws IOException, InterruptedException {
+    super.reduce(key, values, context);
   }
 
   private Iterable<SolrInputDocumentWritable> resolve(

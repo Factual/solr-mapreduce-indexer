@@ -22,6 +22,7 @@ import java.lang.invoke.MethodHandles;
 import java.time.Duration;
 import java.time.Instant;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
@@ -29,17 +30,16 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.GenericOptionsParser;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
-import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.hadoop.MapReduceIndexerToolArgumentParser.Options;
 import org.apache.solr.hadoop.util.Utils;
-import org.apache.solr.hadoop.util.ZooKeeperInspector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.io.Files;
 
 public abstract class IndexTool extends Configured implements Tool {
 
@@ -95,6 +95,8 @@ public abstract class IndexTool extends Configured implements Tool {
     // auto update shard count
     if (options.zkOptions.zkHost != null) {
       options.shards = options.zkOptions.shardUrls.size();
+    } else {
+      options.shards = options.reducers;
     }
 
     FileSystem fs = options.outputDir.getFileSystem(job.getConfiguration());
@@ -114,49 +116,10 @@ public abstract class IndexTool extends Configured implements Tool {
     
     FileOutputFormat.setOutputPath(job, outputReduceDir);
     
-    if (job.getConfiguration().get(JobContext.REDUCE_CLASS_ATTR) == null) { // enable customization
-      job.setReducerClass(SolrReducer.class);
-    }
     if (options.updateConflictResolver == null) {
       throw new IllegalArgumentException("updateConflictResolver must not be null");
     }
     job.getConfiguration().set(SolrReducer.UPDATE_CONFLICT_RESOLVER, options.updateConflictResolver);
-
-    if (options.zkOptions.zkHost != null) {
-      assert options.zkOptions.collection != null;
-      /*
-       * MapReduce partitioner that partitions the Mapper output such that each
-       * SolrInputDocument gets sent to the SolrCloud shard that it would have
-       * been sent to if the document were ingested via the standard SolrCloud
-       * Near Real Time (NRT) API.
-       * 
-       * In other words, this class implements the same partitioning semantics
-       * as the standard SolrCloud NRT API. This enables to mix batch updates
-       * from MapReduce ingestion with updates from standard NRT ingestion on
-       * the same SolrCloud cluster, using identical unique document keys.
-       */
-      if (job.getConfiguration().get(JobContext.PARTITIONER_CLASS_ATTR) == null) { // enable customization
-        job.setPartitionerClass(SolrCloudPartitioner.class);
-      }
-      job.getConfiguration().set(SolrCloudPartitioner.ZKHOST, options.zkOptions.zkHost);
-      job.getConfiguration().set(SolrCloudPartitioner.COLLECTION, options.zkOptions.collection);
-    }
-    job.getConfiguration().setInt(SolrCloudPartitioner.SHARDS, options.shards);
-
-    job.setOutputFormatClass(SolrOutputFormat.class);
-    if (options.solrHomeDir != null) {
-      SolrOutputFormat.setupSolrHomeCache(options.solrHomeDir, job);
-    } else {
-      assert options.zkOptions.zkHost != null;
-      // use the config that this collection uses for the SolrHomeCache.
-      ZooKeeperInspector zki = new ZooKeeperInspector();
-      try (SolrZkClient zkClient = zki.getZkClient(options.zkOptions.zkHost)) {
-        String configName = zki.readConfigName(zkClient, options.zkOptions.collection);
-        File tmpSolrHomeDir = zki.downloadConfigDir(zkClient, configName);
-        SolrOutputFormat.setupSolrHomeCache(tmpSolrHomeDir, job);
-        options.solrHomeDir = tmpSolrHomeDir;
-      }
-    }
 
     attemptDryRun(job, options, programStart);
 
@@ -254,4 +217,46 @@ public abstract class IndexTool extends Configured implements Tool {
     options.reducers = Math.max(reducers, options.shards);
   }
 
+
+  public static File setupConfigDir(File dir) throws IOException {
+
+    File confDir = new File(dir, "conf");
+    if (!confDir.isDirectory()) {
+      // create a temporary directory with "conf" subdir and mv the config in there.  This is
+      // necessary because of CDH-11188; solrctl does not generate nor accept directories with e.g.
+      // conf/solrconfig.xml which is necessary for proper solr operation.  This should work
+      // even if solrctl changes.
+      confDir = new File(Files.createTempDir().getAbsolutePath(), "conf");
+      confDir.getParentFile().deleteOnExit();
+      Files.move(dir, confDir);
+      dir = confDir.getParentFile();
+    }
+  
+    FileUtils.writeStringToFile(new File(dir, "solr.xml"), "<solr><solrcloud></solrcloud></solr>", "UTF-8");
+    LOG.info("Wrote solr configs to: {}", confDir);
+ 
+    verifyConfigDir(confDir);
+    String confPath = confDir.getAbsolutePath();
+    
+    File newPath = new File(confPath.substring(0,confPath.length()-"conf".length()) + "/core1/conf");
+    LOG.info("Copy solr configs to: {}", newPath);
+    FileUtils.copyDirectory(confDir, newPath);
+    
+    return dir;
+  }
+  
+  private static void verifyConfigDir(File confDir) throws IOException {
+    File solrConfigFile = new File(confDir, "solrconfig.xml");
+    if (!solrConfigFile.exists()) {
+      throw new IOException("Detected invalid Solr config dir in ZooKeeper - Reason: File not found: "
+          + solrConfigFile.getName());
+    }
+    if (!solrConfigFile.isFile()) {
+      throw new IOException("Detected invalid Solr config dir in ZooKeeper - Reason: Not a file: "
+          + solrConfigFile.getName());
+    }
+    if (!solrConfigFile.canRead()) {
+      throw new IOException("Insufficient permissions to read file: " + solrConfigFile);
+    }    
+  }
 }

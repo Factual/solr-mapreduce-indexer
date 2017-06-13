@@ -55,7 +55,7 @@ public class SolrOutputFormat<K, V> extends FileOutputFormat<K, V> {
   public static final String SETUP_OK = "solr.output.format.setup";
 
   /** The key used to pass the zip file name through the configuration. */
-  public static final String ZIP_NAME = "solr.zip.name";
+  public static final String ZIP_NAMES = "solr.zip.names";
 
   /**
    * The base name of the zip file containing the configuration information.
@@ -116,7 +116,7 @@ public class SolrOutputFormat<K, V> extends FileOutputFormat<K, V> {
    * configuration.
    */
   public static String getZipName(Configuration conf) {
-    return conf.get(ZIP_NAME, ZIP_FILE_BASE_NAME);
+    return conf.get(ZIP_NAMES, ZIP_FILE_BASE_NAME);
   }
 
   /**
@@ -163,9 +163,9 @@ public class SolrOutputFormat<K, V> extends FileOutputFormat<K, V> {
     return new SolrRecordWriter<>(context, workDir, batchSize);
   }
 
-  public static void setupSolrHomeCache(File solrHomeDir, Job job) throws IOException{
+  public static void setupSolrHomeCache(String outputId, File solrHomeDir, Job job) throws IOException{
     File solrHomeZip = createSolrHomeZip(solrHomeDir);
-    addSolrConfToDistributedCache(job, solrHomeZip);
+    addSolrConfToDistributedCache(outputId, job, solrHomeZip);
   }
 
   public static File createSolrHomeZip(File solrHomeDir) throws IOException {
@@ -181,20 +181,21 @@ public class SolrOutputFormat<K, V> extends FileOutputFormat<K, V> {
     return solrHomeZip;
   }
 
-  public static void addSolrConfToDistributedCache(Job job, File solrHomeZip)
+  public static void addSolrConfToDistributedCache(String outputId, Job job, File solrHomeZip)
       throws IOException {
     // Make a reasonably unique name for the zip file in the distributed cache
     // to avoid collisions if multiple jobs are running.
-    String hdfsZipName = UUID.randomUUID().toString() + '.'
+    String hdfsZipName = (outputId == null ? "" : outputId + '.') + UUID.randomUUID().toString() + '.'
         + ZIP_FILE_BASE_NAME;
     Configuration jobConf = job.getConfiguration();
-    jobConf.set(ZIP_NAME, hdfsZipName);
+    String prevZipNames = jobConf.get(ZIP_NAMES, "");
+    jobConf.set(ZIP_NAMES, ("".equals(prevZipNames) ? "" : prevZipNames + ",") + hdfsZipName);
 
-    Path zipPath = new Path("/tmp", getZipName(jobConf));
+    Path zipPath = new Path("/tmp", hdfsZipName);
     FileSystem fs = FileSystem.get(jobConf);
     fs.copyFromLocalFile(new Path(solrHomeZip.toString()), zipPath);
     final URI baseZipUrl = fs.getUri().resolve(
-        zipPath.toString() + '#' + getZipName(jobConf));
+        zipPath.toString() + '#' + hdfsZipName);
 
     //DistributedCache.addCacheArchive(baseZipUrl, jobConf);
     job.addCacheArchive(baseZipUrl);
