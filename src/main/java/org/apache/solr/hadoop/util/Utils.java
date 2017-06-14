@@ -141,7 +141,7 @@ public final class Utils {
     
     FileSystem fs = outputReduceDir.getFileSystem(conf);
     final String dirPrefix = SolrOutputFormat.getOutputName(Job.getInstance(conf)); // note this is normally just "part";
-    FileStatus[] dirs = fs.listStatus(outputReduceDir, (Path path) -> path.getName().startsWith(dirPrefix));
+    FileStatus[] dirs = fs.globStatus(outputReduceDir, (Path path) -> path.getName().startsWith(dirPrefix));
     for (FileStatus dir : dirs) {
       if (!dir.isDirectory()) {
         throw new IllegalStateException("Not a directory: " + dir.getPath());
