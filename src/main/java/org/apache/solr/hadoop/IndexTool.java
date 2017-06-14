@@ -130,10 +130,6 @@ public abstract class IndexTool extends Configured implements Tool {
     job.setMapSpeculativeExecution(false);
     job.setReduceSpeculativeExecution(false);
 
-    //crank up memory on reducers
-    job.getConfiguration().setInt("mapreduce.reduce.memory.mb", 32768);
-    job.getConfiguration().set("mapreduce.reduce.java.opts", "-Xmx16384M");
-
     Instant startTime = Instant.now();
     if (!Utils.waitForCompletion(job, options.isVerbose)) {
       return -1; // job failed

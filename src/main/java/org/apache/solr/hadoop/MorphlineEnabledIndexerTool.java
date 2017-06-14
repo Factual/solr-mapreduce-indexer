@@ -173,7 +173,11 @@ public class MorphlineEnabledIndexerTool extends IndexTool {
         options.solrHomeDir = tmpSolrHomeDir;
       }
     }
-    
+
+    //crank up memory on reducers
+    job.getConfiguration().setInt("mapreduce.reduce.memory.mb", 32768);
+    job.getConfiguration().set("mapreduce.reduce.java.opts", "-Xmx16384M");
+
     // continue
     return 1;
     
