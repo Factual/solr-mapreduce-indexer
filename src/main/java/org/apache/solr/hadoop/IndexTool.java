@@ -226,9 +226,6 @@ public abstract class IndexTool extends Configured implements Tool {
       Files.move(dir, confDir);
       dir = confDir.getParentFile();
     }
-  
-    FileUtils.writeStringToFile(new File(dir, "solr.xml"), "<solr><solrcloud></solrcloud></solr>", "UTF-8");
-    LOG.info("Wrote solr configs to: {}", confDir);
  
     verifyConfigDir(confDir);
     String confPath = confDir.getAbsolutePath();
