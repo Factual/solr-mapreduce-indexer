@@ -67,6 +67,7 @@ public class IndexMergeTool extends Configured implements Tool {
       int numInputShards = Utils.listSortedOutputShardDirs(conf, options.inputDir).length;
       // should shards be taken from zookeeper?
       if (numInputShards > options.shards) {
+        options.fanout = Math.min(options.fanout, (int) Utils.ceilDivide(numInputShards, options.shards));
         return merge(conf, options, numInputShards);
       } else {
         LOG.info("Merging {} input shards into {} shards has no effect.", numInputShards, options.shards);
