@@ -29,6 +29,9 @@ import java.util.List;
 
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
+
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
@@ -186,6 +189,16 @@ public class TreeMergeOutputFormat extends FileOutputFormat<Text, NullWritable> 
           LOG.info("Optimizing Solr: Closing index writer");
           writer.close();
 
+          Path inputShard = shards.get(0);
+          FileSystem fs = inputShard.getFileSystem(context.getConfiguration());
+          Path solrHomeSrc = new Path(inputShard.getParent().getParent(), SolrRecordWriter.SOLR_HOME_DIR);
+          LOG.info("Checking solr home directory: " + solrHomeSrc);
+          if (fs.exists(solrHomeSrc)) {
+            Path solrHomeDst = new Path(workDir.getParent().getParent(),  SolrRecordWriter.SOLR_HOME_DIR);
+            LOG.info("Copying: " + solrHomeSrc + " to " + solrHomeDst);
+            FileUtil.copy(fs, solrHomeSrc, fs, solrHomeDst, false, context.getConfiguration());
+          }
+          
         } catch (IOException iOException) {
           LOG.error("Error while setting commit data/closing: ", iOException);
         }

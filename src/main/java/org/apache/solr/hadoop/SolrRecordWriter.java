@@ -56,6 +56,8 @@ public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   public static final String DEFAULT_CORE_NAME = "core1";
+  
+  public static final String SOLR_HOME_DIR =  "solr_home";
 
   public final static List<String> allowedConfigDirectories = new ArrayList<>(
           Arrays.asList(new String[]{"conf", "lib", "solr.xml", DEFAULT_CORE_NAME}));
@@ -124,7 +126,7 @@ public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
               SolrOutputFormat.getSolrWriterThreadCount(conf),
               SolrOutputFormat.getSolrWriterQueueSize(conf));
 
-      Path outputSolrHomeDir = new Path(outputShardDir, "solr_home");
+      Path outputSolrHomeDir = new Path(outputShardDir, SOLR_HOME_DIR);
       fs.copyFromLocalFile(new Path(solr.getCoreContainer().getSolrHome()), outputSolrHomeDir);
 
     } finally {
