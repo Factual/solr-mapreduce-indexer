@@ -76,14 +76,15 @@ public class IndexMergeTool extends Configured implements Tool {
     }
     
     public boolean merge(Configuration conf, IndexMergeOptions options, int numInputShards) throws IOException, InterruptedException, ClassNotFoundException {
+      // TODO: make configurable and ensure it works with globStatus.  however, not sure we want to enable this as it auto-deletes the original inputs.
+      boolean mergeInPlace = false;
+      
       LOG.info("The number of reducers is greater than the number of shards.  Invoking the tree merge process");
       
       Path inputDir = options.inputDir;
       Path outputDir = options.outputDir;
       int targetShards = options.shards;
       int fanout = options.fanout;
-      
-      Path outputTreeMergeStep = new Path(outputDir, "mtree-merge-output");
 
       LOG.info("outputDir: {}", outputDir);
       LOG.info("inputDir: {}", inputDir);
@@ -97,8 +98,11 @@ public class IndexMergeTool extends Configured implements Tool {
       }
       LOG.debug("MTree merge iterations to do: {}", mtreeMergeIterations);
       int mtreeMergeIteration = 1;
-
+      
       while (numInputShards > targetShards) { // run a mtree merge iteration
+
+          Path outputTreeMergeStep = new Path(outputDir, "mtree-merge-output-" + mtreeMergeIteration);
+
           Instant startTime = Instant.now();
           Job mergeTreeJob = Job.getInstance(conf);
 
@@ -139,16 +143,27 @@ public class IndexMergeTool extends Configured implements Tool {
           Instant endTime = Instant.now();
           LOG.info("MTree merge iteration {}/{}: Done. Merging {} shards into {} shards using fanout {} took {}",
                   new Object[]{mtreeMergeIteration, mtreeMergeIterations, numInputShards, (numInputShards / fanout), fanout, Duration.between(startTime, endTime)});
+          
+          if (mergeInPlace) {
+            if (!Utils.delete(inputDir, true, fs)) {
+              return false;
+            }
+            if (!Utils.rename(outputTreeMergeStep, inputDir, fs)) {
+                return false;
+            }            
+          } else {
+            inputDir = new Path(outputTreeMergeStep, "part-*");
+          }
 
-          if (!Utils.delete(inputDir, true, fs)) {
-              return false;
-          }
-          if (!Utils.rename(outputTreeMergeStep, inputDir, fs)) {
-              return false;
-          }
           assert numInputShards % fanout == 0;
           numInputShards = numInputShards / fanout;
           mtreeMergeIteration++;
+          
+          if (!mergeInPlace && numInputShards == targetShards) {
+            if (!Utils.rename(outputTreeMergeStep, new Path(outputDir, "final"), fs)) {
+              return false;
+            }            
+          }
       }
       assert numInputShards == targetShards;
 
