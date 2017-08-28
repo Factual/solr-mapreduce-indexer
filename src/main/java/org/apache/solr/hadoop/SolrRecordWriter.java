@@ -228,6 +228,9 @@ public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
    */
   @Override
   public void write(K key, V value) throws IOException {
+    if (value == null) {
+      return;
+    }
     heartBeater.needHeartBeat();
     try {
       try {
