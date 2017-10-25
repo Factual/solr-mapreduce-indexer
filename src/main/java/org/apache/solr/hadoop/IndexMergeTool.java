@@ -33,6 +33,8 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 import com.google.common.io.ByteStreams;
+
+import org.apache.solr.client.solrj.embedded.EmbeddedSolrServer;
 import org.apache.solr.hadoop.IndexMergeToolArgumentParser.IndexMergeOptions;;
 
 public class IndexMergeTool extends Configured implements Tool {
@@ -162,7 +164,7 @@ public class IndexMergeTool extends Configured implements Tool {
           if (!mergeInPlace && numInputShards == targetShards) {
             if (!Utils.rename(outputTreeMergeStep, new Path(outputDir, "final"), fs)) {
               return false;
-            }            
+            }
           }
       }
       assert numInputShards == targetShards;

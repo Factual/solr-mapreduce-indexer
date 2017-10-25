@@ -16,8 +16,11 @@
  */
 package org.apache.solr.hadoop;
 
+import org.apache.solr.client.solrj.embedded.EmbeddedSolrServer;
 import org.apache.solr.hadoop.util.HeartBeater;
 import org.apache.solr.hadoop.util.Utils;
+
+import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
@@ -28,8 +31,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.google.common.base.Preconditions;
+import com.google.common.io.Files;
+
 import java.util.Arrays;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
@@ -197,6 +203,27 @@ public class TreeMergeOutputFormat extends FileOutputFormat<Text, NullWritable> 
             Path solrHomeDst = new Path(workDir.getParent().getParent(),  SolrRecordWriter.SOLR_HOME_DIR);
             LOG.info("Copying: " + solrHomeSrc + " to " + solrHomeDst);
             FileUtil.copy(fs, solrHomeSrc, fs, solrHomeDst, false, context.getConfiguration());
+            
+            LOG.info("Reading back {}", workDir.getParent().getParent());
+            
+            final File tempSolrDir = Files.createTempDir();
+            Runtime.getRuntime().addShutdownHook(new Thread() {
+              @Override
+              public void run() {
+                  try {
+                    FileUtils.deleteDirectory(tempSolrDir);
+                  } catch (IOException e) {
+                  }
+              }
+            });      
+            Path solrHomeLocalPath = new Path(tempSolrDir.getAbsolutePath());
+            fs.copyToLocalFile(solrHomeDst, solrHomeLocalPath);
+
+            // Ensure this directory can be read back without altering hdfs index (cleans up some index files)
+            EmbeddedSolrServer solr = SolrRecordWriter.createEmbeddedSolrServerWithHome(context.getConfiguration(), workDir.getParent().getParent(), new Path(solrHomeLocalPath, SolrRecordWriter.SOLR_HOME_DIR));
+            solr.close();
+            LOG.info("Successfully read back {}", workDir.getParent().getParent());
+            
           }
           
         } catch (IOException iOException) {
@@ -204,6 +231,7 @@ public class TreeMergeOutputFormat extends FileOutputFormat<Text, NullWritable> 
         }
 
         LOG.info("Optimizing Solr: Done closing index writer in {}ms", timer.getTime());
+        
         context.setStatus("Done");
 
       } catch (Exception e) {

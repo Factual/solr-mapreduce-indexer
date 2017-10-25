@@ -134,11 +134,8 @@ public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
     }
   }
 
-  public static EmbeddedSolrServer createEmbeddedSolrServer(Configuration conf, Path outputShardDir)
+  public static EmbeddedSolrServer createEmbeddedSolrServerWithHome(Configuration conf, Path outputShardDir, Path solrHomeDir)
           throws IOException {
-    String outputId = outputShardDir.getParent().getName();
-    Path solrHomeDir = SolrRecordWriter.findSolrConfig(conf, outputId);
-
     FileSystem fs = outputShardDir.getFileSystem(conf);
     
     LOG.info("Creating embedded Solr server with solrHomeDir: " + solrHomeDir + ", fs: " + fs + ", outputShardDir: " + outputShardDir);
@@ -175,7 +172,14 @@ public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
     }
 
     EmbeddedSolrServer solr = new EmbeddedSolrServer(container, DEFAULT_CORE_NAME);
-    return solr;
+    return solr;    
+  }
+  
+  public static EmbeddedSolrServer createEmbeddedSolrServer(Configuration conf, Path outputShardDir)
+          throws IOException {
+    String outputId = outputShardDir.getParent().getName();
+    Path solrHomeDir = SolrRecordWriter.findSolrConfig(conf, outputId);
+    return createEmbeddedSolrServerWithHome(conf, outputShardDir, solrHomeDir);
   }
 
   public static void incrementCounter(TaskID taskId, String groupName, String counterName, long incr) {
