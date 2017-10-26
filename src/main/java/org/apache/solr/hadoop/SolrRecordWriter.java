@@ -155,8 +155,9 @@ public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
     // TODO: This is fragile and should be well documented
     System.setProperty("solr.directoryFactory", HdfsDirectoryFactory.class.getName());
     System.setProperty("solr.lock.type", DirectoryFactory.LOCK_TYPE_HDFS);
-    System.setProperty("solr.hdfs.nrtcachingdirectory", "false");
+    System.setProperty("solr.hdfs.nrtcachingdirectory.enable", "false");
     System.setProperty("solr.hdfs.blockcache.enabled", "false");
+    System.setProperty("solr.hdfs.blockcache.read.enabled", "false");
     System.setProperty("solr.autoCommit.maxTime", "600000");
     System.setProperty("solr.autoSoftCommit.maxTime", "-1");
 
