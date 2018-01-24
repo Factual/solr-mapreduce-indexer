@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.factual.solr.indexing</groupId>
     <artifactId>solr-mapreduce-indexer</artifactId>
-    <version>0.0.3-SNAPSHOT</version>
+    <version>0.0.4-SNAPSHOT</version>
     <dependencies>    
         <dependency>
             <groupId>net.sourceforge.argparse4j</groupId>
@@ -286,7 +286,7 @@
         <repository>
             <id>nexus</id>
             <name>Factual nexus repository</name>
-            <url>http://maven.corp.factual.com/nexus/content/groups/public</url>
+            <url>https://maven.corp.factual.com/nexus/content/groups/public</url>
         </repository>
         <repository>
             <id>in-project</id>
@@ -298,12 +298,12 @@
       <repository>
         <id>releases</id>
         <name>Factual Releases</name>
-        <url>http://maven.corp.factual.com/nexus/content/repositories/releases</url>
+        <url>https://maven.corp.factual.com/nexus/content/repositories/releases</url>
       </repository>
       <snapshotRepository>
         <id>snapshots</id>
         <name>Factual Snapshots</name>
-        <url>http://maven.corp.factual.com/nexus/content/repositories/snapshots</url>
+        <url>https://maven.corp.factual.com/nexus/content/repositories/snapshots</url>
       </snapshotRepository>
     </distributionManagement>
     <build>
