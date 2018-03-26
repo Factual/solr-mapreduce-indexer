@@ -110,7 +110,7 @@ public final class IndexMergeToolArgumentParser {
             }
             return path;
           }
-        }.verifyHasScheme().verifyIsAbsolute().verifyCanWriteParent())
+        }.verifyHasScheme().verifyIsAbsolute())
         .required(true)
         .help("HDFS directory with Solr indexes to merge."
                 + "Example: hdfs://c2202.mycompany.com/user/$USER/test");    
