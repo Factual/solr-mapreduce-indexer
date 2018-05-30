@@ -1,18 +1,24 @@
 package org.apache.solr.hadoop;
 
 
-import org.apache.solr.hadoop.util.PathArgumentType;
-import com.google.common.collect.Lists;
-import org.apache.solr.hadoop.util.Utils;
-import org.apache.solr.hadoop.util.ToolRunnerHelpFormatter;
-import org.apache.solr.hadoop.util.ZooKeeperInspector;
 import java.io.File;
 import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.solr.hadoop.dedup.RetainMostRecentUpdateConflictResolver;
+import org.apache.solr.hadoop.morphline.MorphlineMapRunner;
+import org.apache.solr.hadoop.util.PathArgumentType;
+import org.apache.solr.hadoop.util.ToolRunnerHelpFormatter;
+import org.apache.solr.hadoop.util.Utils;
+import org.kitesdk.morphline.base.Fields;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.impl.Arguments;
 import net.sourceforge.argparse4j.impl.action.HelpArgumentAction;
@@ -24,13 +30,6 @@ import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.FeatureControl;
 import net.sourceforge.argparse4j.inf.Namespace;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.Path;
-import org.apache.solr.hadoop.dedup.RetainMostRecentUpdateConflictResolver;
-import org.apache.solr.hadoop.morphline.MorphlineMapRunner;
-import org.kitesdk.morphline.base.Fields;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public final class MapReduceIndexerToolArgumentParser {
@@ -193,7 +192,7 @@ public final class MapReduceIndexerToolArgumentParser {
     Argument morphlineFileArg = requiredGroup.addArgument("--morphline-file")
             .metavar("FILE")
             .type(new FileArgumentType().verifyExists().verifyIsFile().verifyCanRead())
-            .required(true)
+            .required(false)
             .help("Relative or absolute path to a local config file that contains one or more morphlines. "
                     + "The file must be UTF-8 encoded. Example: /path/to/morphline.conf");
 
@@ -391,7 +390,7 @@ public final class MapReduceIndexerToolArgumentParser {
     // trailing positional arguments
     Argument inputFilesArg = parser.addArgument("input-files")
             .metavar("HDFS_URI")
-            .type(new PathArgumentType(conf).verifyHasScheme().verifyExists().verifyCanRead())
+            .type(new PathArgumentType(conf).verifyHasScheme())
             .nargs("*")
             .setDefault()
             .help("HDFS URI of file or directory tree to index.");
@@ -416,7 +415,7 @@ public final class MapReduceIndexerToolArgumentParser {
     if (opts.inputLists == null) {
       opts.inputLists = Collections.EMPTY_LIST;
     }
-    opts.inputFiles = ns.getList(inputFilesArg.getDest());
+    opts.inputFiles = ns.getList(inputFilesArg.getDest());    
     opts.outputDir = (Path) ns.get(outputDirArg.getDest());
     opts.mappers = ns.getInt(mappersArg.getDest());
     opts.reducers = ns.getInt(reducersArg.getDest());
@@ -429,18 +428,15 @@ public final class MapReduceIndexerToolArgumentParser {
     opts.fairSchedulerPool = ns.getString(fairSchedulerPoolArg.getDest());
     opts.isDryRun = ns.getBoolean(dryRunArg.getDest());
     opts.isVerbose = ns.getBoolean(verboseArg.getDest());
-    opts.zkHost = ns.getString(zkHostArg.getDest());
     opts.shards = ns.getInt(shardsArg.getDest());
-    opts.shardUrls = buildShardUrls(ns.getList(shardUrlsArg.getDest()), opts.shards);
     opts.goLive = ns.getBoolean(goLiveArg.getDest());
     opts.goLiveThreads = ns.getInt(goLiveThreadsArg.getDest());
-    opts.collection = ns.getString(collectionArg.getDest());
+    opts.zkOptions = new ZookeeperOptions(ns.getString(zkHostArg.getDest()), ns.getString(collectionArg.getDest()), ZookeeperOptions.buildShardUrls(ns.getList(shardUrlsArg.getDest()), opts.shards));
 
     try {
       if (opts.reducers == 0) {
         throw new ArgumentParserException("--reducers must not be zero", parser);
       }
-      verifyGoLiveArgs(opts, parser);
     } catch (ArgumentParserException e) {
       parser.handleError(e);
       return 1;
@@ -461,15 +457,6 @@ public final class MapReduceIndexerToolArgumentParser {
   private String nonSolrCloud(String msg) {
     return showNonSolrCloud ? msg : "";
   }
-  
-  static List<List<String>> buildShardUrls(List<Object> urls, Integer numShards) {
-    if (urls == null) return null;
-    return  Lists.partition(
-              urls.stream()
-                  .map(u -> u.toString())
-                  .collect(Collectors.toList()),numShards);   
-  }
-  
 
   /**
    * Marker trick to prevent processing of any remaining arguments once --help
@@ -481,82 +468,25 @@ public final class MapReduceIndexerToolArgumentParser {
   public static final class Options {
 
     boolean goLive;
-    String collection;
-    String zkHost;
     Integer goLiveThreads;
-    List<List<String>> shardUrls;
-    List<Path> inputLists;
-    List<Path> inputFiles;
-    Path outputDir;
-    int mappers;
-    int reducers;
+    public List<Path> inputLists;
+    public List<Path> inputFiles;
+    public Path outputDir;
+    public int mappers;
+    public int reducers;
     String updateConflictResolver;
     int fanout;
     Integer shards;
     int maxSegments;
     File morphlineFile;
     String morphlineId;
-    File solrHomeDir;
+    public File solrHomeDir;
     String fairSchedulerPool;
     boolean isDryRun;
     File log4jConfigFile;
     boolean isVerbose;
-  }
-  
-  public static void verifyGoLiveArgs(MapReduceIndexerToolArgumentParser.Options opts, ArgumentParser parser) throws ArgumentParserException {
-    if (opts.zkHost == null && opts.solrHomeDir == null) {
-      throw new ArgumentParserException("At least one of --zk-host or --solr-home-dir is required", parser);
-    }
-    if (opts.goLive && opts.zkHost == null && opts.shardUrls == null) {
-      throw new ArgumentParserException("--go-live requires that you also pass --shard-url or --zk-host", parser);
-    }
-    
-    if (opts.zkHost != null && opts.collection == null) {
-      throw new ArgumentParserException("--zk-host requires that you also pass --collection", parser);
-    }
-    
-    if (opts.zkHost != null) {
-      return;
-      // verify structure of ZK directory later, to avoid checking run-time errors during parsing.
-    } else if (opts.shardUrls != null) {
-      if (opts.shardUrls.isEmpty()) {
-        throw new ArgumentParserException("--shard-url requires at least one URL", parser);
-      }
-    } else if (opts.shards != null) {
-      if (opts.shards <= 0) {
-        throw new ArgumentParserException("--shards must be a positive number: " + opts.shards, parser);
-      }
-    } else {
-      throw new ArgumentParserException("You must specify one of the following (mutually exclusive) arguments: "
-          + "--zk-host or --shard-url or --shards", parser);
-    }
+    public ZookeeperOptions zkOptions;
 
-    if (opts.shardUrls != null) {
-      opts.shards = opts.shardUrls.size();
-    }
-    
-    assert opts.shards != null;
-    assert opts.shards > 0;
-  }
-  
-    public static void verifyZKStructure(MapReduceIndexerToolArgumentParser.Options opts, ArgumentParser parser) throws ArgumentParserException {
-    if (opts.zkHost != null) {
-      assert opts.collection != null;
-      ZooKeeperInspector zki = new ZooKeeperInspector();
-      try {
-        opts.shardUrls = zki.extractShardUrls(opts.zkHost, opts.collection);
-      } catch (Exception e) {
-        LOG.debug("Cannot extract SolrCloud shard URLs from ZooKeeper", e);
-        throw new ArgumentParserException(e, parser);
-      }
-      assert opts.shardUrls != null;
-      if (opts.shardUrls.isEmpty()) {
-        throw new ArgumentParserException("--zk-host requires ZooKeeper " + opts.zkHost
-          + " to contain at least one SolrCore for collection: " + opts.collection, parser);
-      }
-      opts.shards = opts.shardUrls.size();
-      LOG.debug("Using SolrCloud shard URLs: {}", opts.shardUrls);
-    }
   }
 
 }

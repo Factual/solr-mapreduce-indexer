@@ -5,8 +5,8 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.factual.solr.indexing</groupId>
     <artifactId>solr-mapreduce-indexer</artifactId>
-    <version>0.1</version>
-    <dependencies>
+    <version>0.0.4-SNAPSHOT</version>
+    <dependencies>    
         <dependency>
             <groupId>net.sourceforge.argparse4j</groupId>
             <artifactId>argparse4j</artifactId>
@@ -16,7 +16,7 @@
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-mapreduce-client-core</artifactId>
-            <version>2.6.0-cdh5.10.0</version>
+            <version>2.6.0-cdh5.13.0</version>
             <scope>provided</scope>
             <type>jar</type>
             <exclusions>
@@ -31,84 +31,10 @@
             </exclusions>
         </dependency>
         <dependency>
-            <groupId>org.apache.solr</groupId>
-            <artifactId>solr-solrj</artifactId>
-            <version>6.4.2</version>
+            <groupId>com.factual</groupId>
+            <artifactId>shaded-solr</artifactId>
+            <version>6.4.2-SNAPSHOT</version>
             <type>jar</type>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.apache.httpcomponents</groupId>
-                    <artifactId>httpclient</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.apache.httpcomponents</groupId>
-                    <artifactId>httpcore</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.apache.httpcomponents</groupId>
-                    <artifactId>httpmime</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.solr</groupId>
-            <artifactId>solr-core</artifactId>
-            <version>6.4.2</version>
-            <type>jar</type>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.apache.hadoop</groupId>
-                    <artifactId>hadoop-auth</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.apache.hadoop</groupId>
-                    <artifactId>hadoop-common</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.apache.hadoop</groupId>
-                    <artifactId>hadoop-hdfs</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.apache.httpcomponents</groupId>
-                    <artifactId>httpclient</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.apache.httpcomponents</groupId>
-                    <artifactId>httpcore</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.apache.httpcomponents</groupId>
-                    <artifactId>httpmime</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>log4j</groupId>
-                    <artifactId>log4j</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.apache.lucene</groupId>
-                    <artifactId>lucene-backward-codecs</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.apache.lucene</groupId>
-                    <artifactId>lucene-expressions</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>org.kitesdk</groupId>
-            <artifactId>kite-morphlines-core</artifactId>
-            <version>1.1.0</version>
-            <type>jar</type>
-            <exclusions>
-                <exclusion>
-                    <groupId>com.codahale.metrics</groupId>
-                    <artifactId>metrics-core</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>com.codahale.metrics</groupId>
-                    <artifactId>metrics-healthchecks</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
 
         <dependency>
@@ -116,6 +42,12 @@
             <artifactId>kite-morphlines-solr-core</artifactId>
             <version>1.1.0</version>
             <type>jar</type>
+            <exclusions>
+              <exclusion>
+                <groupId>org.apache.solr</groupId>
+                <artifactId>solr-core</artifactId>
+              </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.kitesdk</groupId>
@@ -164,7 +96,7 @@
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-common</artifactId>
-            <version>2.6.0-cdh5.10.0</version>
+            <version>2.6.0-cdh5.13.0</version>
             <scope>provided</scope>
             <type>jar</type>
             <exclusions>
@@ -197,7 +129,7 @@
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-hdfs</artifactId>
-            <version>2.6.0-cdh5.10.0</version>
+            <version>2.6.0-cdh5.13.0</version>
             <scope>provided</scope>
             <type>jar</type>
             <exclusions>
@@ -217,6 +149,14 @@
             <version>6.4.2</version>
             <type>jar</type>
             <exclusions>
+                <exclusion>
+                    <groupId>org.apache.solr</groupId>
+                    <artifactId>solr-solrj</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.solr</groupId>
+                    <artifactId>solr-core</artifactId>
+                </exclusion>
                 <exclusion>
                     <groupId>org.apache.httpcomponents</groupId>
                     <artifactId>httpclient</artifactId>
@@ -335,16 +275,6 @@
             <type>jar</type>
             <scope>provided</scope>
         </dependency>
-        <dependency>
-            <groupId>org.apache.lucene</groupId>
-            <artifactId>lucene-codecs</artifactId>
-            <version>6.4.2</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.lucene</groupId>
-            <artifactId>lucene-backward-codecs</artifactId>
-            <version>6.4.2</version>
-        </dependency>
     </dependencies>
     <repositories>
         <repository>
@@ -356,19 +286,26 @@
         <repository>
             <id>nexus</id>
             <name>Factual nexus repository</name>
-            <url>http://maven.corp.factual.com/nexus/content/groups/public</url>
+            <url>https://maven.corp.factual.com/nexus/content/groups/public</url>
         </repository>
         <repository>
             <id>in-project</id>
             <name>In Project Repo</name>
             <url>file://${project.basedir}/libs</url>
         </repository>
-        <repository>
-            <id>factual-maven</id>
-            <name>factual</name>
-            <url>http://maven.corp.factual.com/nexus/content/repositories/releases</url>
-        </repository>
     </repositories>
+    <distributionManagement>
+      <repository>
+        <id>releases</id>
+        <name>Factual Releases</name>
+        <url>https://maven.corp.factual.com/nexus/content/repositories/releases</url>
+      </repository>
+      <snapshotRepository>
+        <id>snapshots</id>
+        <name>Factual Snapshots</name>
+        <url>https://maven.corp.factual.com/nexus/content/repositories/snapshots</url>
+      </snapshotRepository>
+    </distributionManagement>
     <build>
         <plugins>
             <plugin>

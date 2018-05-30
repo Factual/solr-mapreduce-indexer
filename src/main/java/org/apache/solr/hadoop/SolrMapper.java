@@ -16,25 +16,18 @@
  */
 package org.apache.solr.hadoop;
 
-import org.apache.solr.hadoop.util.Utils;
 import java.io.IOException;
 
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.solr.hadoop.util.Utils;
 
 public class SolrMapper<KEYIN, VALUEIN> extends Mapper<KEYIN, VALUEIN, Text, SolrInputDocumentWritable> {
-  
-  private Path solrHomeDir;
 
   @Override
   protected void setup(Context context) throws IOException, InterruptedException {
     Utils.getLogConfigFile(context.getConfiguration());
     super.setup(context);
-    solrHomeDir = SolrRecordWriter.findSolrConfig(context.getConfiguration());
   }
   
-  protected Path getSolrHomeDir() {
-    return solrHomeDir;
-  }
 }

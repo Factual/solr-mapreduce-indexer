@@ -51,11 +51,13 @@ import org.apache.solr.core.SolrResourceLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
+public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
 
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   public static final String DEFAULT_CORE_NAME = "core1";
+  
+  public static final String SOLR_HOME_DIR =  "solr_home";
 
   public final static List<String> allowedConfigDirectories = new ArrayList<>(
           Arrays.asList(new String[]{"conf", "lib", "solr.xml", DEFAULT_CORE_NAME}));
@@ -100,6 +102,8 @@ class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
   private final int batchSize;
   private long numDocsWritten = 0;
   private long nextLogTime = System.nanoTime();
+  
+  private Path outputShardDir;
 
   private static final HashMap<TaskID, Reducer<?, ?, ?, ?>.Context> contextMap = new HashMap<>();
 
@@ -114,26 +118,30 @@ class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
     try {
       heartBeater.needHeartBeat();
 
-      Path solrHomeDir = SolrRecordWriter.findSolrConfig(conf);
+      this.outputShardDir = outputShardDir;
       FileSystem fs = outputShardDir.getFileSystem(conf);
-      EmbeddedSolrServer solr = createEmbeddedSolrServer(solrHomeDir, fs, outputShardDir);
+      EmbeddedSolrServer solr = createEmbeddedSolrServer(conf, outputShardDir);
       batchWriter = new BatchWriter(solr, batchSize,
               context.getTaskAttemptID().getTaskID(),
               SolrOutputFormat.getSolrWriterThreadCount(conf),
               SolrOutputFormat.getSolrWriterQueueSize(conf));
+
+      Path outputSolrHomeDir = new Path(outputShardDir, SOLR_HOME_DIR);
+      fs.copyFromLocalFile(new Path(solr.getCoreContainer().getSolrHome()), outputSolrHomeDir);
 
     } finally {
       heartBeater.cancelHeartBeat();
     }
   }
 
-  public static EmbeddedSolrServer createEmbeddedSolrServer(Path solrHomeDir, FileSystem fs, Path outputShardDir)
+  public static EmbeddedSolrServer createEmbeddedSolrServerWithHome(Configuration conf, Path outputShardDir, Path solrHomeDir)
           throws IOException {
-
+    FileSystem fs = outputShardDir.getFileSystem(conf);
+    
     LOG.info("Creating embedded Solr server with solrHomeDir: " + solrHomeDir + ", fs: " + fs + ", outputShardDir: " + outputShardDir);
 
     Path solrDataDir = new Path(outputShardDir, "data");
-
+    
     String dataDirStr = solrDataDir.toUri().toString();
 
     SolrResourceLoader loader = new SolrResourceLoader(Paths.get(solrHomeDir.toString()), null, null);
@@ -147,8 +155,9 @@ class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
     // TODO: This is fragile and should be well documented
     System.setProperty("solr.directoryFactory", HdfsDirectoryFactory.class.getName());
     System.setProperty("solr.lock.type", DirectoryFactory.LOCK_TYPE_HDFS);
-    System.setProperty("solr.hdfs.nrtcachingdirectory", "false");
+    System.setProperty("solr.hdfs.nrtcachingdirectory.enable", "false");
     System.setProperty("solr.hdfs.blockcache.enabled", "false");
+    System.setProperty("solr.hdfs.blockcache.read.enabled", "false");
     System.setProperty("solr.autoCommit.maxTime", "600000");
     System.setProperty("solr.autoSoftCommit.maxTime", "-1");
 
@@ -159,12 +168,19 @@ class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
 
     if (!(core.getDirectoryFactory() instanceof HdfsDirectoryFactory)) {
       throw new UnsupportedOperationException(
-              "Invalid configuration. Currently, the only DirectoryFactory supported is "
+              "Invalid configuration with : " + core.getDirectoryFactory().getClass().getName() + ". Currently, the only DirectoryFactory supported is "
               + HdfsDirectoryFactory.class.getSimpleName());
     }
 
     EmbeddedSolrServer solr = new EmbeddedSolrServer(container, DEFAULT_CORE_NAME);
-    return solr;
+    return solr;    
+  }
+  
+  public static EmbeddedSolrServer createEmbeddedSolrServer(Configuration conf, Path outputShardDir)
+          throws IOException {
+    String outputId = outputShardDir.getParent().getName();
+    Path solrHomeDir = SolrRecordWriter.findSolrConfig(conf, outputId);
+    return createEmbeddedSolrServerWithHome(conf, outputShardDir, solrHomeDir);
   }
 
   public static void incrementCounter(TaskID taskId, String groupName, String counterName, long incr) {
@@ -186,14 +202,21 @@ class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
     contextMap.put(taskID, context);
   }
 
-  public static Path findSolrConfig(Configuration conf) throws IOException {
+  public static Path findSolrConfig(Configuration conf, String outputId) throws IOException {
     // FIXME when mrunit supports the new cache apis
     //URI[] localArchives = context.getCacheArchives();
     Path[] localArchives = DistributedCache.getLocalCacheArchives(conf);
     for (Path unpackedDir : localArchives) {
-      if (unpackedDir.getName().equals(SolrOutputFormat.getZipName(conf))) {
-        LOG.info("Using this unpacked directory as solr home: {}", unpackedDir);
-        return unpackedDir;
+      if (outputId == null) {
+        if (unpackedDir.getName().equals(SolrOutputFormat.getZipName(conf))) {
+          LOG.info("Using this unpacked directory as solr home: {}", unpackedDir);
+          return unpackedDir;
+        }
+      } else {
+        if (unpackedDir.getName().split("\\.", 2)[0].equals(outputId)) {
+          LOG.info("Using this unpacked directory as solr home: {}", unpackedDir);
+          return unpackedDir;
+        }
       }
     }
     throw new IOException(String.format(Locale.ENGLISH,
@@ -210,6 +233,9 @@ class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
    */
   @Override
   public void write(K key, V value) throws IOException {
+    if (value == null) {
+      return;
+    }
     heartBeater.needHeartBeat();
     try {
       try {
@@ -248,6 +274,11 @@ class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
       }
       LOG.info("docsWritten: {}", numDocsWritten);
       batchWriter.close(context);
+
+      // Ensure this directory can be read back without altering hdfs index (cleans up some index files)
+      EmbeddedSolrServer solr = createEmbeddedSolrServer(context.getConfiguration(), outputShardDir);
+      solr.close();
+      
    } catch (IOException | SolrServerException | InterruptedException e) {
       if (e instanceof IOException) {
         throw (IOException) e;

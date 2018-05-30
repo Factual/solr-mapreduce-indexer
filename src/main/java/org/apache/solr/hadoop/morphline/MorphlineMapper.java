@@ -21,6 +21,7 @@ import java.lang.invoke.MethodHandles;
 import java.util.Collection;
 import java.util.Map;
 
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -28,9 +29,10 @@ import org.apache.solr.client.solrj.response.SolrPingResponse;
 import org.apache.solr.client.solrj.response.UpdateResponse;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.SolrInputField;
-import org.apache.solr.hadoop.util.HeartBeater;
 import org.apache.solr.hadoop.SolrInputDocumentWritable;
 import org.apache.solr.hadoop.SolrMapper;
+import org.apache.solr.hadoop.SolrRecordWriter;
+import org.apache.solr.hadoop.util.HeartBeater;
 import org.apache.solr.morphlines.solr.DocumentLoader;
 import org.apache.solr.schema.IndexSchema;
 import org.slf4j.Logger;
@@ -57,7 +59,8 @@ public class MorphlineMapper extends SolrMapper<LongWritable, Text> {
   private Context context;
   private MorphlineMapRunner runner;
   private HeartBeater heartBeater;
-  
+  private Path solrHomeDir;
+
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   
   protected IndexSchema getSchema() {
@@ -67,10 +70,15 @@ public class MorphlineMapper extends SolrMapper<LongWritable, Text> {
   protected Context getContext() {
     return context;
   }
+  
+  protected Path getSolrHomeDir() {
+    return solrHomeDir;
+  }
 
   @Override
   protected void setup(Context context) throws IOException, InterruptedException {
     super.setup(context);
+    solrHomeDir = SolrRecordWriter.findSolrConfig(context.getConfiguration(), null);
     this.context = context;
     heartBeater = new HeartBeater(context);
     this.runner = new MorphlineMapRunner(
