@@ -142,7 +142,19 @@ public class TreeMergeOutputFormat extends FileOutputFormat<Text, NullWritable> 
 
         Directory[] indexes = new Directory[shards.size()];
         for (int i = 0; i < shards.size(); i++) {
-          indexes[i] = new HdfsDirectory(shards.get(i), context.getConfiguration());
+          Path shard = shards.get(i);
+          indexes[i] = new HdfsDirectory(shard, context.getConfiguration());
+          Path lockFile = new Path(shard, "write.lock");
+          FileSystem fs = shard.getFileSystem(context.getConfiguration());
+          if (fs.exists(lockFile)) {
+            if (fs.delete(lockFile, false)) {
+              LOG.info("Successfully deleted shard lock file: {}", lockFile.toString());
+            } else {
+              throw new RuntimeException("Failed to delete lock file before merging shards: " + lockFile);
+            }
+          } else {
+            LOG.info("Previous lock file does not exist, no deletion needed: {}", lockFile.toString());
+          }
         }
 
         context.setStatus("Logically merging " + shards.size() + " shards into one shard");
