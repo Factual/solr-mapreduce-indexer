@@ -136,7 +136,7 @@ public abstract class IndexTool extends Configured implements Tool {
     }
 
     Instant endTime = Instant.now();
-    LOG.info("Done. Indexing into {} reducers took {}", new Object[]{options.reducers, Duration.between(startTime, endTime)});
+    LOG.info("Done. Indexing into {} reducers took {}", options.reducers, Duration.between(startTime, endTime));
 
     Utils.goodbye(job, programStart);
     return 0;

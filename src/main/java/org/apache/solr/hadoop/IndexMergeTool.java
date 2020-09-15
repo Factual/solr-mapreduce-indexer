@@ -124,7 +124,7 @@ public class IndexMergeTool extends Configured implements Tool {
           Path inputStepDir = new Path(outputDir, "mtree-merge-input-iteration" + mtreeMergeIteration);
           // TODO: figure out if this works without morphlines
           Path fullInputList = new Path(inputStepDir, MorphlineEnabledIndexerTool.FULL_INPUT_LIST);
-          LOG.debug("MTree merge iteration {}/{}: Creating input list file for mappers {}", new Object[]{mtreeMergeIteration, mtreeMergeIterations, fullInputList});
+          LOG.debug("MTree merge iteration {}/{}: Creating input list file for mappers {}", mtreeMergeIteration, mtreeMergeIterations, fullInputList);
           long numFiles = createTreeMergeInputDirList(inputDir, fs, fullInputList, mergeTreeJob);
           if (numFiles != numInputShards) {
               throw new IllegalStateException("Not same reducers: " + numInputShards + ", numFiles: " + numFiles);
@@ -133,8 +133,7 @@ public class IndexMergeTool extends Configured implements Tool {
           NLineInputFormat.setNumLinesPerSplit(mergeTreeJob, fanout);
           FileOutputFormat.setOutputPath(mergeTreeJob, outputTreeMergeStep);
 
-          LOG.info("MTree merge iteration {}/{}: Merging {} shards into {} shards using fanout {}", new Object[]{
-                  mtreeMergeIteration, mtreeMergeIterations, numInputShards, (numInputShards / fanout), fanout});
+          LOG.info("MTree merge iteration {}/{}: Merging {} shards into {} shards using fanout {}", mtreeMergeIteration, mtreeMergeIterations, numInputShards, (numInputShards / fanout), fanout);
 
           if (!Utils.waitForCompletion(mergeTreeJob, isVerbose)) {
               return false; // job failed
@@ -144,7 +143,7 @@ public class IndexMergeTool extends Configured implements Tool {
           }
           Instant endTime = Instant.now();
           LOG.info("MTree merge iteration {}/{}: Done. Merging {} shards into {} shards using fanout {} took {}",
-                  new Object[]{mtreeMergeIteration, mtreeMergeIterations, numInputShards, (numInputShards / fanout), fanout, Duration.between(startTime, endTime)});
+              mtreeMergeIteration, mtreeMergeIterations, numInputShards, (numInputShards / fanout), fanout, Duration.between(startTime, endTime));
           
           if (mergeInPlace) {
             if (!Utils.delete(inputDir, true, fs)) {
