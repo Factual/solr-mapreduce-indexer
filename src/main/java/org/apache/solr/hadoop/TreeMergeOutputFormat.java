@@ -190,7 +190,7 @@ public class TreeMergeOutputFormat extends FileOutputFormat<Text, NullWritable> 
           // commitTimeMSec in the commit data to do replication.
           LOG.info("Setting commitData");
           writer.commit();
-          SolrIndexWriter.setCommitData(writer);
+          SolrIndexWriter.setCommitData(writer, 0);
 
           LOG.info("Optimizing Solr: Closing index writer");
           writer.close();

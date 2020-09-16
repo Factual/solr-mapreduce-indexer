@@ -155,7 +155,7 @@ public class GoLiveTool extends Configured implements Tool {
       try {
         LOG.info("Committing live merge...");
         if (options.zkOptions.zkHost != null) {
-          try (CloudSolrClient server = new CloudSolrClient.Builder().withZkHost(options.zkOptions.zkHost).build()) {
+          try (CloudSolrClient server = new CloudSolrClient.Builder(Collections.singletonList(options.zkOptions.zkHost), Optional.empty()).build()) {
             server.setDefaultCollection(options.zkOptions.collection);
             server.commit();
           }

@@ -156,16 +156,12 @@ public final class ZooKeeperInspector {
   private String checkForAlias(SolrZkClient zkClient, String collection)
       throws KeeperException, InterruptedException {
     byte[] aliasData = zkClient.getData(ZkStateReader.ALIASES, null, null, true);
-    Aliases aliases = ClusterState.load(aliasData);
-    String alias = aliases.getCollectionAlias(collection);
-    if (alias != null) {
-      List<String> aliasList = StrUtils.splitSmart(alias, ",", true);
-      if (aliasList.size() > 1) {
-        throw new IllegalArgumentException("collection cannot be an alias that maps to multiple collections");
-      }
-      collection = aliasList.get(0);
+    Aliases aliases = Aliases.fromJSON(aliasData, 0);
+    List<String> aliasList = aliases.resolveAliases(collection);
+    if (aliasList.size() > 1) {
+      throw new IllegalArgumentException("collection cannot be an alias that maps to multiple collections");
     }
-    return collection;
+    return aliasList.get(0);
   }
   
   /**
