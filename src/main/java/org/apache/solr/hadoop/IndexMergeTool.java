@@ -34,7 +34,6 @@ import org.slf4j.LoggerFactory;
 import com.google.common.base.Preconditions;
 import com.google.common.io.ByteStreams;
 
-import org.apache.solr.client.solrj.embedded.EmbeddedSolrServer;
 import org.apache.solr.hadoop.IndexMergeToolArgumentParser.IndexMergeOptions;;
 
 public class IndexMergeTool extends Configured implements Tool {

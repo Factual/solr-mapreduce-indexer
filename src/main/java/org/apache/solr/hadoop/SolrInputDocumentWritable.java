@@ -21,9 +21,9 @@ import java.io.DataOutput;
 import java.io.IOException;
 
 import org.apache.hadoop.io.Writable;
-import org.apache.solr.common.SolrInputDocument;
-import org.apache.solr.common.util.FastOutputStream;
-import org.apache.solr.common.util.JavaBinCodec;
+import org.shaded.apache.solr.common.SolrInputDocument;
+import org.shaded.apache.solr.common.util.FastOutputStream;
+import org.shaded.apache.solr.common.util.JavaBinCodec;
 
 public class SolrInputDocumentWritable implements Writable {
   private SolrInputDocument sid;

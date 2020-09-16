@@ -18,11 +18,11 @@ package org.apache.solr.hadoop;
 
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskID;
-import org.apache.solr.client.solrj.SolrServerException;
-import org.apache.solr.client.solrj.embedded.EmbeddedSolrServer;
-import org.apache.solr.client.solrj.response.UpdateResponse;
-import org.apache.solr.common.SolrInputDocument;
-import org.apache.solr.common.util.ExecutorUtil;
+import org.shaded.apache.solr.client.solrj.SolrServerException;
+import org.shaded.apache.solr.client.solrj.embedded.EmbeddedSolrServer;
+import org.shaded.apache.solr.client.solrj.response.UpdateResponse;
+import org.shaded.apache.solr.common.SolrInputDocument;
+import org.shaded.apache.solr.common.util.ExecutorUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
