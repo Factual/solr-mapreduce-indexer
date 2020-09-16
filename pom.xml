@@ -278,33 +278,25 @@
     </dependencies>
     <repositories>
         <repository>
-            <id>maven-hadoop</id>
-            <name>Hadoop Releases</name>
-            <url>https://repository.cloudera.com/content/repositories/releases/</url>
-        </repository>
-
-        <repository>
-            <id>nexus</id>
-            <name>Factual nexus repository</name>
-            <url>https://maven.corp.factual.com/nexus/content/groups/public</url>
-        </repository>
-        <repository>
-            <id>in-project</id>
-            <name>In Project Repo</name>
-            <url>file://${project.basedir}/libs</url>
+            <id>foursquare</id>
+            <url>https://foursquaredev.jfrog.io/foursquaredev/fsnexus</url>
         </repository>
     </repositories>
+    <pluginRepositories>
+        <pluginRepository>
+            <id>foursquare</id>
+            <url>https://foursquaredev.jfrog.io/foursquaredev/fsnexus</url>
+        </pluginRepository>
+    </pluginRepositories>
     <distributionManagement>
-      <repository>
-        <id>releases</id>
-        <name>Factual Releases</name>
-        <url>https://maven.corp.factual.com/nexus/content/repositories/releases</url>
-      </repository>
-      <snapshotRepository>
-        <id>snapshots</id>
-        <name>Factual Snapshots</name>
-        <url>https://maven.corp.factual.com/nexus/content/repositories/snapshots</url>
-      </snapshotRepository>
+        <repository>
+            <id>foursquare</id>
+            <url>https://foursquaredev.jfrog.io/foursquaredev/fsfactual-releases-local</url>
+        </repository>
+        <snapshotRepository>
+            <id>foursquare</id>
+            <url>https://foursquaredev.jfrog.io/foursquaredev/fsfactual-snapshots-local</url>
+        </snapshotRepository>
     </distributionManagement>
     <build>
         <plugins>
