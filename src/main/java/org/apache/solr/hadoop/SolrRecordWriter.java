@@ -16,6 +16,7 @@
  */
 package org.apache.solr.hadoop;
 
+import org.apache.hadoop.mapreduce.*;
 import org.apache.solr.hadoop.util.HeartBeater;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
@@ -35,10 +36,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.filecache.DistributedCache;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.mapreduce.RecordWriter;
-import org.apache.hadoop.mapreduce.Reducer;
-import org.apache.hadoop.mapreduce.TaskAttemptContext;
-import org.apache.hadoop.mapreduce.TaskID;
 import org.shaded.apache.solr.client.solrj.SolrServerException;
 import org.shaded.apache.solr.client.solrj.embedded.EmbeddedSolrServer;
 import org.shaded.apache.solr.common.SolrInputDocument;
@@ -220,8 +217,11 @@ public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
       }
     }
     throw new IOException(String.format(Locale.ENGLISH,
-            "No local cache archives, where is %s:%s", SolrOutputFormat
-            .getSetupOk(), SolrOutputFormat.getZipName(conf)));
+        "No local cache archives, where is setupOk:%s zipName:%s localArchives:%s outputId:%s",
+        SolrOutputFormat.getSetupOk(),
+        SolrOutputFormat.getZipName(conf),
+        String.join(",", conf.get(MRJobConfig.CACHE_LOCALARCHIVES)),
+        outputId));
   }
 
   /**
