@@ -219,9 +219,12 @@ public class TreeMergeOutputFormat extends FileOutputFormat<Text, NullWritable> 
             Path solrHomeLocalPath = new Path(tempSolrDir.getAbsolutePath());
             fs.copyToLocalFile(solrHomeDst, solrHomeLocalPath);
 
+            SolrRecordWriter.removeLocalCoreProperties(context.getConfiguration(), new Path(solrHomeLocalPath, SolrRecordWriter.SOLR_HOME_DIR));
+
             // Ensure this directory can be read back without altering hdfs index (cleans up some index files)
             EmbeddedSolrServer solr = SolrRecordWriter.createEmbeddedSolrServerWithHome(context.getConfiguration(), workDir.getParent().getParent(), new Path(solrHomeLocalPath, SolrRecordWriter.SOLR_HOME_DIR));
             solr.close();
+            SolrRecordWriter.removeLocalCoreProperties(context.getConfiguration(), new Path(solrHomeLocalPath, SolrRecordWriter.SOLR_HOME_DIR));
             LOG.info("Successfully read back {}", workDir.getParent().getParent());
             
           }

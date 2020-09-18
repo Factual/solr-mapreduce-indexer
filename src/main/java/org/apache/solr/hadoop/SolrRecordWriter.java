@@ -39,12 +39,7 @@ import org.shaded.apache.solr.client.solrj.SolrServerException;
 import org.shaded.apache.solr.client.solrj.embedded.EmbeddedSolrServer;
 import org.shaded.apache.solr.common.SolrException;
 import org.shaded.apache.solr.common.SolrInputDocument;
-import org.shaded.apache.solr.core.CoreContainer;
-import org.shaded.apache.solr.core.CoreDescriptor;
-import org.shaded.apache.solr.core.DirectoryFactory;
-import org.shaded.apache.solr.core.HdfsDirectoryFactory;
-import org.shaded.apache.solr.core.SolrCore;
-import org.shaded.apache.solr.core.SolrResourceLoader;
+import org.shaded.apache.solr.core.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -178,6 +173,15 @@ public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
     return new EmbeddedSolrServer(container, DEFAULT_CORE_NAME);
   }
 
+  public static void removeLocalCoreProperties(Configuration conf, Path solrHomeDir) throws IOException {
+    // clean up core.properties so CoreContainer can load it
+    LocalFileSystem lfs = FileSystem.getLocal(conf);
+    Path coreProperties = new Path(new Path(solrHomeDir, DEFAULT_CORE_NAME), CorePropertiesLocator.PROPERTIES_FILENAME);
+    if (lfs.delete(coreProperties, false)) {
+      LOG.info("deleted {}", CorePropertiesLocator.PROPERTIES_FILENAME);
+    }
+  }
+
   private static void debugLs(Configuration conf, Path path) throws IOException {
     LocalFileSystem fs = FileSystem.getLocal(conf);
     RemoteIterator<LocatedFileStatus> files = fs.listFiles(path, true);
@@ -294,19 +298,30 @@ public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
       LOG.info("docsWritten: {}", numDocsWritten);
       batchWriter.close(context);
 
-      // Ensure this directory can be read back without altering hdfs index (cleans up some index files)
-      EmbeddedSolrServer solr = createEmbeddedSolrServer(context.getConfiguration(), outputShardDir);
-      solr.close();
-      
-   } catch (IOException | SolrServerException | InterruptedException e) {
-      if (e instanceof IOException) {
-        throw (IOException) e;
+      if (context != null) {
+        Configuration conf = context.getConfiguration();
+
+        removeLocalCoreProperties(conf, solrHomeDir);
+
+        LOG.info("reload solr at {}", solrHomeDir);
+        // Ensure this directory can be read back without altering hdfs index (cleans up some index files)
+        try (EmbeddedSolrServer solr = createEmbeddedSolrServerWithHome(conf, outputShardDir, solrHomeDir)) {
+          LOG.info("solr loaded 2nd time");
+        } catch (SolrException e) {
+          // TODO make this configurable to cause failure
+          LOG.error("failed to reload solr", e);
+        }
+        removeLocalCoreProperties(conf, solrHomeDir);
+      } else {
+        LOG.error("no context found to validate solr");
       }
+
+    } catch (SolrServerException | InterruptedException e) {
       throw new IOException(e);
     } finally {
       heartBeater.cancelHeartBeat();
       heartBeater.close();
-   }
+    }
 
     context.setStatus("Done");
   }
