@@ -16,6 +16,7 @@
  */
 package org.apache.solr.hadoop;
 
+import org.apache.hadoop.fs.*;
 import org.apache.hadoop.mapreduce.*;
 import org.apache.solr.hadoop.util.HeartBeater;
 import java.io.IOException;
@@ -34,10 +35,9 @@ import java.util.concurrent.TimeUnit;
 import com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.filecache.DistributedCache;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.shaded.apache.solr.client.solrj.SolrServerException;
 import org.shaded.apache.solr.client.solrj.embedded.EmbeddedSolrServer;
+import org.shaded.apache.solr.common.SolrException;
 import org.shaded.apache.solr.common.SolrInputDocument;
 import org.shaded.apache.solr.core.CoreContainer;
 import org.shaded.apache.solr.core.CoreDescriptor;
@@ -57,7 +57,7 @@ public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
   public static final String SOLR_HOME_DIR =  "solr_home";
 
   public final static List<String> allowedConfigDirectories = new ArrayList<>(
-          Arrays.asList(new String[]{"conf", "lib", "solr.xml", DEFAULT_CORE_NAME}));
+          Arrays.asList("conf", "lib", "solr.xml", DEFAULT_CORE_NAME));
 
   public final static Set<String> requiredConfigDirectories = new HashSet<>();
 
@@ -99,8 +99,8 @@ public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
   private final int batchSize;
   private long numDocsWritten = 0;
   private long nextLogTime = System.nanoTime();
-  
-  private Path outputShardDir;
+  private final Path outputShardDir;
+  private final Path solrHomeDir;
 
   private static final HashMap<TaskID, Reducer<?, ?, ?, ?>.Context> contextMap = new HashMap<>();
 
@@ -117,7 +117,9 @@ public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
 
       this.outputShardDir = outputShardDir;
       FileSystem fs = outputShardDir.getFileSystem(conf);
-      EmbeddedSolrServer solr = createEmbeddedSolrServer(conf, outputShardDir);
+      String outputId = outputShardDir.getParent().getName();
+      solrHomeDir = findAndCopySolrConf(conf, outputId);
+      EmbeddedSolrServer solr = createEmbeddedSolrServerWithHome(conf, outputShardDir, solrHomeDir);
       batchWriter = new BatchWriter(solr, batchSize,
               context.getTaskAttemptID().getTaskID(),
               SolrOutputFormat.getSolrWriterThreadCount(conf),
@@ -136,6 +138,8 @@ public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
     FileSystem fs = outputShardDir.getFileSystem(conf);
     
     LOG.info("Creating embedded Solr server with solrHomeDir: " + solrHomeDir + ", fs: " + fs + ", outputShardDir: " + outputShardDir);
+
+    debugLs(conf, solrHomeDir);
 
     Path solrDataDir = new Path(outputShardDir, "data");
     
@@ -169,15 +173,28 @@ public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
               + HdfsDirectoryFactory.class.getSimpleName());
     }
 
-    EmbeddedSolrServer solr = new EmbeddedSolrServer(container, DEFAULT_CORE_NAME);
-    return solr;    
+    return new EmbeddedSolrServer(container, DEFAULT_CORE_NAME);
   }
-  
-  public static EmbeddedSolrServer createEmbeddedSolrServer(Configuration conf, Path outputShardDir)
-          throws IOException {
-    String outputId = outputShardDir.getParent().getName();
-    Path solrHomeDir = SolrRecordWriter.findSolrConfig(conf, outputId);
-    return createEmbeddedSolrServerWithHome(conf, outputShardDir, solrHomeDir);
+
+  private static void debugLs(Configuration conf, Path path) throws IOException {
+    LocalFileSystem fs = FileSystem.getLocal(conf);
+    RemoteIterator<LocatedFileStatus> files = fs.listFiles(path, true);
+    while (files.hasNext()) {
+      LocatedFileStatus file = files.next();
+      LOG.info("ls: {}", file.getPath());
+    }
+  }
+
+  private static Path findAndCopySolrConf(Configuration conf, String outputId) throws IOException {
+    LocalFileSystem fs = FileSystem.getLocal(conf);
+    Path solrHomeDir = new Path("./solrHome-" + outputId);
+
+    // DistributedCache.getLocalCacheArchives path seems write protected now
+    Path solrHomeCache = SolrRecordWriter.findSolrConfig(conf, outputId);
+    LOG.info("copy solr config from {} to {}", solrHomeCache, solrHomeDir);
+    fs.copyFromLocalFile(false, solrHomeCache, solrHomeDir);
+
+    return solrHomeDir;
   }
 
   public static void incrementCounter(TaskID taskId, String groupName, String counterName, long incr) {
