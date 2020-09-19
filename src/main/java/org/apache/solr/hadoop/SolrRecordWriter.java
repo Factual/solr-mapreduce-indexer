@@ -54,7 +54,9 @@ public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
 
   public static final String DEFAULT_CORE_NAME = "core1";
   
-  public static final String SOLR_HOME_DIR =  "solr_home";
+  public static final String SOLR_HOME_DIR = "solr_home";
+
+  public static final String DATA_DIR = "data";
 
   public final static List<String> allowedConfigDirectories = new ArrayList<>(
           Arrays.asList("conf", "lib", "solr.xml", DEFAULT_CORE_NAME));
@@ -141,7 +143,7 @@ public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
 
     debugLs(conf, solrHomeDir);
 
-    Path solrDataDir = new Path(outputShardDir, "data");
+    Path solrDataDir = new Path(outputShardDir, DATA_DIR);
     
     String dataDirStr = solrDataDir.toUri().toString();
 
