@@ -60,6 +60,11 @@ import org.slf4j.LoggerFactory;
 public final class Utils {
 
   private static final String LOG_CONFIG_FILE = "hadoop.log4j.configuration";
+  /**
+   * Used by {@link Utils#listSortedOutputShardDirs(org.apache.hadoop.conf.Configuration, org.apache.hadoop.fs.Path)}
+   * to get the directories containing {@link SolrOutputFormat} indexes
+   */
+  public static final String DIRECTORY_PREFIX_OVERRIDE = "solr-mapreduce-indexer.directory.prefix";
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   public static void setLogConfigFile(File file, Configuration conf) {
@@ -140,7 +145,8 @@ public final class Utils {
           IOException {
     
     FileSystem fs = outputReduceDir.getFileSystem(conf);
-    final String dirPrefix = SolrOutputFormat.getOutputName(Job.getInstance(conf)); // note this is normally just "part";
+    // use either an override directory prefix OR the part file prefix which is usually `part` or set by "mapreduce.output.basename"
+    final String dirPrefix = conf.get(DIRECTORY_PREFIX_OVERRIDE, SolrOutputFormat.getOutputName(Job.getInstance(conf)));
     FileStatus[] dirs = fs.globStatus(outputReduceDir, (Path path) -> path.getName().startsWith(dirPrefix));
     for (FileStatus dir : dirs) {
       if (!dir.isDirectory()) {

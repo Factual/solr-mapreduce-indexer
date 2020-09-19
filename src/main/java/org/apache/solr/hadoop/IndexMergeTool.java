@@ -71,7 +71,7 @@ public class IndexMergeTool extends Configured implements Tool {
         options.fanout = Math.min(options.fanout, (int) Utils.ceilDivide(numInputShards, options.shards));
         return merge(conf, options, numInputShards);
       } else {
-        LOG.info("Merging {} input shards into {} shards has no effect.", numInputShards, options.shards);
+        LOG.info("Merging {} input shards into {} shards has no effect. Input:{}", numInputShards, options.shards, options.inputDir);
         return true;
       }
     }
