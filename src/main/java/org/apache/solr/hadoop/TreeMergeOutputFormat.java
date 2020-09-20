@@ -257,7 +257,7 @@ public class TreeMergeOutputFormat extends FileOutputFormat<Text, NullWritable> 
       LOG.info("Writing shard number file");
       Preconditions.checkArgument(shards.size() > 0);
       String shard = shards.get(0).getParent().getParent().getName(); // move up from "data/index"
-      String taskId = shard.substring("part-m-".length(), shard.length()); // e.g. part-m-00001
+      String taskId = shard.replaceAll("^[^0-9]+", ""); // e.g. part-m-00001 or core2
       int taskNum = Integer.parseInt(taskId);
       int outputShardNum = taskNum / shards.size();
 
