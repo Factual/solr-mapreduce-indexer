@@ -70,6 +70,10 @@ public class SolrOutputFormat<K, V> extends FileOutputFormat<K, V> {
    */
   public static final String OUTPUT_ZIP_FILE = "solr.output.zip.format";
 
+  public static final String SOLR_XML_FILE = "solr.xml";
+
+  public static final String SOLR_XML_CONTENTS = "<solr></solr>";
+
   static int defaultSolrWriterThreadCount = 0;
 
   public static final String SOLR_WRITER_THREAD_COUNT = "solr.record.writer.num.threads";
@@ -244,9 +248,9 @@ public class SolrOutputFormat<K, V> extends FileOutputFormat<K, V> {
       zos.closeEntry();
     }
     
-    ZipEntry ze = new ZipEntry("solr.xml");
+    ZipEntry ze = new ZipEntry(SOLR_XML_FILE);
     zos.putNextEntry(ze);
-    zos.write("<solr></solr>".getBytes("UTF-8"));
+    zos.write(SOLR_XML_CONTENTS.getBytes("UTF-8"));
     zos.flush();
     zos.closeEntry();
     zos.close();

@@ -16,6 +16,8 @@
  */
 package org.apache.solr.hadoop;
 
+import org.apache.hadoop.fs.*;
+import org.apache.hadoop.mapreduce.*;
 import org.apache.solr.hadoop.util.HeartBeater;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
@@ -33,21 +35,11 @@ import java.util.concurrent.TimeUnit;
 import com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.filecache.DistributedCache;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.mapreduce.RecordWriter;
-import org.apache.hadoop.mapreduce.Reducer;
-import org.apache.hadoop.mapreduce.TaskAttemptContext;
-import org.apache.hadoop.mapreduce.TaskID;
 import org.shaded.apache.solr.client.solrj.SolrServerException;
 import org.shaded.apache.solr.client.solrj.embedded.EmbeddedSolrServer;
+import org.shaded.apache.solr.common.SolrException;
 import org.shaded.apache.solr.common.SolrInputDocument;
-import org.shaded.apache.solr.core.CoreContainer;
-import org.shaded.apache.solr.core.CoreDescriptor;
-import org.shaded.apache.solr.core.DirectoryFactory;
-import org.shaded.apache.solr.core.HdfsDirectoryFactory;
-import org.shaded.apache.solr.core.SolrCore;
-import org.shaded.apache.solr.core.SolrResourceLoader;
+import org.shaded.apache.solr.core.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,10 +49,12 @@ public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
 
   public static final String DEFAULT_CORE_NAME = "core1";
   
-  public static final String SOLR_HOME_DIR =  "solr_home";
+  public static final String SOLR_HOME_DIR = "solr_home";
+
+  public static final String DATA_DIR = "data";
 
   public final static List<String> allowedConfigDirectories = new ArrayList<>(
-          Arrays.asList(new String[]{"conf", "lib", "solr.xml", DEFAULT_CORE_NAME}));
+          Arrays.asList("conf", "lib", "solr.xml", DEFAULT_CORE_NAME));
 
   public final static Set<String> requiredConfigDirectories = new HashSet<>();
 
@@ -102,8 +96,8 @@ public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
   private final int batchSize;
   private long numDocsWritten = 0;
   private long nextLogTime = System.nanoTime();
-  
-  private Path outputShardDir;
+  private final Path outputShardDir;
+  private final Path solrHomeDir;
 
   private static final HashMap<TaskID, Reducer<?, ?, ?, ?>.Context> contextMap = new HashMap<>();
 
@@ -120,7 +114,9 @@ public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
 
       this.outputShardDir = outputShardDir;
       FileSystem fs = outputShardDir.getFileSystem(conf);
-      EmbeddedSolrServer solr = createEmbeddedSolrServer(conf, outputShardDir);
+      String outputId = outputShardDir.getParent().getName();
+      solrHomeDir = findAndCopySolrConf(conf, outputId);
+      EmbeddedSolrServer solr = createEmbeddedSolrServerWithHome(conf, outputShardDir, solrHomeDir);
       batchWriter = new BatchWriter(solr, batchSize,
               context.getTaskAttemptID().getTaskID(),
               SolrOutputFormat.getSolrWriterThreadCount(conf),
@@ -140,7 +136,9 @@ public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
     
     LOG.info("Creating embedded Solr server with solrHomeDir: " + solrHomeDir + ", fs: " + fs + ", outputShardDir: " + outputShardDir);
 
-    Path solrDataDir = new Path(outputShardDir, "data");
+    debugLs(conf, solrHomeDir);
+
+    Path solrDataDir = new Path(outputShardDir, DATA_DIR);
     
     String dataDirStr = solrDataDir.toUri().toString();
 
@@ -172,15 +170,37 @@ public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
               + HdfsDirectoryFactory.class.getSimpleName());
     }
 
-    EmbeddedSolrServer solr = new EmbeddedSolrServer(container, DEFAULT_CORE_NAME);
-    return solr;    
+    return new EmbeddedSolrServer(container, DEFAULT_CORE_NAME);
   }
-  
-  public static EmbeddedSolrServer createEmbeddedSolrServer(Configuration conf, Path outputShardDir)
-          throws IOException {
-    String outputId = outputShardDir.getParent().getName();
-    Path solrHomeDir = SolrRecordWriter.findSolrConfig(conf, outputId);
-    return createEmbeddedSolrServerWithHome(conf, outputShardDir, solrHomeDir);
+
+  public static void removeLocalCoreProperties(Configuration conf, Path solrHomeDir) throws IOException {
+    // clean up core.properties so CoreContainer can load it
+    LocalFileSystem lfs = FileSystem.getLocal(conf);
+    Path coreProperties = new Path(new Path(solrHomeDir, DEFAULT_CORE_NAME), CorePropertiesLocator.PROPERTIES_FILENAME);
+    if (lfs.delete(coreProperties, false)) {
+      LOG.info("deleted {}", CorePropertiesLocator.PROPERTIES_FILENAME);
+    }
+  }
+
+  private static void debugLs(Configuration conf, Path path) throws IOException {
+    LocalFileSystem fs = FileSystem.getLocal(conf);
+    RemoteIterator<LocatedFileStatus> files = fs.listFiles(path, true);
+    while (files.hasNext()) {
+      LocatedFileStatus file = files.next();
+      LOG.info("ls: {}", file.getPath());
+    }
+  }
+
+  private static Path findAndCopySolrConf(Configuration conf, String outputId) throws IOException {
+    LocalFileSystem fs = FileSystem.getLocal(conf);
+    Path solrHomeDir = new Path("./solrHome-" + outputId);
+
+    // DistributedCache.getLocalCacheArchives path seems write protected now
+    Path solrHomeCache = SolrRecordWriter.findSolrConfig(conf, outputId);
+    LOG.info("copy solr config from {} to {}", solrHomeCache, solrHomeDir);
+    fs.copyFromLocalFile(false, solrHomeCache, solrHomeDir);
+
+    return solrHomeDir;
   }
 
   public static void incrementCounter(TaskID taskId, String groupName, String counterName, long incr) {
@@ -220,8 +240,11 @@ public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
       }
     }
     throw new IOException(String.format(Locale.ENGLISH,
-            "No local cache archives, where is %s:%s", SolrOutputFormat
-            .getSetupOk(), SolrOutputFormat.getZipName(conf)));
+        "No local cache archives, where is setupOk:%s zipName:%s localArchives:%s outputId:%s",
+        SolrOutputFormat.getSetupOk(),
+        SolrOutputFormat.getZipName(conf),
+        String.join(",", conf.get(MRJobConfig.CACHE_LOCALARCHIVES)),
+        outputId));
   }
 
   /**
@@ -275,19 +298,30 @@ public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
       LOG.info("docsWritten: {}", numDocsWritten);
       batchWriter.close(context);
 
-      // Ensure this directory can be read back without altering hdfs index (cleans up some index files)
-      EmbeddedSolrServer solr = createEmbeddedSolrServer(context.getConfiguration(), outputShardDir);
-      solr.close();
-      
-   } catch (IOException | SolrServerException | InterruptedException e) {
-      if (e instanceof IOException) {
-        throw (IOException) e;
+      if (context != null) {
+        Configuration conf = context.getConfiguration();
+
+        removeLocalCoreProperties(conf, solrHomeDir);
+
+        LOG.info("reload solr at {}", solrHomeDir);
+        // Ensure this directory can be read back without altering hdfs index (cleans up some index files)
+        try (EmbeddedSolrServer solr = createEmbeddedSolrServerWithHome(conf, outputShardDir, solrHomeDir)) {
+          LOG.info("solr loaded 2nd time");
+        } catch (SolrException e) {
+          // TODO make this configurable to cause failure
+          LOG.error("failed to reload solr", e);
+        }
+        removeLocalCoreProperties(conf, solrHomeDir);
+      } else {
+        LOG.error("no context found to validate solr");
       }
+
+    } catch (SolrServerException | InterruptedException e) {
       throw new IOException(e);
     } finally {
       heartBeater.cancelHeartBeat();
       heartBeater.close();
-   }
+    }
 
     context.setStatus("Done");
   }
