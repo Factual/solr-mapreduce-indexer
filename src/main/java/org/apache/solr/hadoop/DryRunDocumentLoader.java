@@ -16,10 +16,10 @@
  */
 package org.apache.solr.hadoop;
 
-import org.apache.solr.client.solrj.response.SolrPingResponse;
-import org.apache.solr.client.solrj.response.UpdateResponse;
-import org.apache.solr.common.SolrInputDocument;
-import org.apache.solr.morphlines.solr.DocumentLoader;
+import org.shaded.apache.solr.client.solrj.response.SolrPingResponse;
+import org.shaded.apache.solr.client.solrj.response.UpdateResponse;
+import org.shaded.apache.solr.common.SolrInputDocument;
+import org.shaded.apache.solr.morphlines.solr.DocumentLoader;
 
 /**
  * Prints documents to stdout instead of loading them into Solr for quicker turnaround during early

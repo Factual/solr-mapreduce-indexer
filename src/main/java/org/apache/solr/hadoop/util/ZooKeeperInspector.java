@@ -19,27 +19,24 @@ package org.apache.solr.hadoop.util;
 import java.io.File;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 
-import org.apache.solr.cloud.ZkController;
-import org.apache.solr.common.SolrException;
-import org.apache.solr.common.cloud.Aliases;
-import org.apache.solr.common.cloud.ClusterState;
-import org.apache.solr.common.cloud.DocCollection;
-import org.apache.solr.common.cloud.Replica;
-import org.apache.solr.common.cloud.Slice;
-import org.apache.solr.common.cloud.SolrZkClient;
-import org.apache.solr.common.cloud.ZkConfigManager;
-import org.apache.solr.common.cloud.ZkCoreNodeProps;
-import org.apache.solr.common.cloud.ZkNodeProps;
-import org.apache.solr.common.cloud.ZkStateReader;
-import org.apache.solr.common.util.StrUtils;
+import org.shaded.apache.solr.cloud.ZkController;
+import org.shaded.apache.solr.common.SolrException;
+import org.shaded.apache.solr.common.cloud.Aliases;
+import org.shaded.apache.solr.common.cloud.ClusterState;
+import org.shaded.apache.solr.common.cloud.DocCollection;
+import org.shaded.apache.solr.common.cloud.Replica;
+import org.shaded.apache.solr.common.cloud.Slice;
+import org.shaded.apache.solr.common.cloud.SolrZkClient;
+import org.shaded.apache.solr.common.cloud.ZkConfigManager;
+import org.shaded.apache.solr.common.cloud.ZkCoreNodeProps;
+import org.shaded.apache.solr.common.cloud.ZkNodeProps;
+import org.shaded.apache.solr.common.cloud.ZkStateReader;
+import org.shaded.apache.solr.common.util.StrUtils;
 import org.apache.solr.hadoop.IndexTool;
 import org.apache.zookeeper.KeeperException;
+import org.shaded.apache.solr.common.util.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -159,16 +156,12 @@ public final class ZooKeeperInspector {
   private String checkForAlias(SolrZkClient zkClient, String collection)
       throws KeeperException, InterruptedException {
     byte[] aliasData = zkClient.getData(ZkStateReader.ALIASES, null, null, true);
-    Aliases aliases = ClusterState.load(aliasData);
-    String alias = aliases.getCollectionAlias(collection);
-    if (alias != null) {
-      List<String> aliasList = StrUtils.splitSmart(alias, ",", true);
-      if (aliasList.size() > 1) {
-        throw new IllegalArgumentException("collection cannot be an alias that maps to multiple collections");
-      }
-      collection = aliasList.get(0);
+    Aliases aliases = Aliases.fromJSON(aliasData, 0);
+    List<String> aliasList = aliases.resolveAliases(collection);
+    if (aliasList.size() > 1) {
+      throw new IllegalArgumentException("collection cannot be an alias that maps to multiple collections");
     }
-    return collection;
+    return aliasList.get(0);
   }
   
   /**

@@ -18,8 +18,8 @@ package org.apache.solr.hadoop.dedup;
 
 import java.util.Comparator;
 
-import org.apache.solr.common.SolrInputDocument;
-import org.apache.solr.common.SolrInputField;
+import org.shaded.apache.solr.common.SolrInputDocument;
+import org.shaded.apache.solr.common.SolrInputField;
 
 /**
  * Default mechanism of determining which of two Solr documents with the same

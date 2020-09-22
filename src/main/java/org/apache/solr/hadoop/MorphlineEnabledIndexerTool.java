@@ -30,7 +30,7 @@ import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.lib.input.NLineInputFormat;
-import org.apache.solr.common.cloud.SolrZkClient;
+import org.shaded.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.hadoop.MapReduceIndexerToolArgumentParser.Options;
 import org.apache.solr.hadoop.morphline.MorphlineMapRunner;
 import org.apache.solr.hadoop.morphline.MorphlineMapper;
@@ -96,7 +96,7 @@ public class MorphlineEnabledIndexerTool extends IndexTool {
     int reducers = options.reducers;
     LOG.info("Using these parameters: "
             + "numFiles: {}, mappers: {}, realMappers: {}, reducers: {}, shards: {}, fanout: {}, maxSegments: {}",
-            new Object[]{numFiles, mappers, realMappers, reducers, options.shards, options.fanout, options.maxSegments});
+        numFiles, mappers, realMappers, reducers, options.shards, options.fanout, options.maxSegments);
 
     LOG.info("Randomizing list of {} input files to spread indexing load more evenly among mappers", numFiles);
     Instant startTime = Instant.now();
@@ -122,7 +122,7 @@ public class MorphlineEnabledIndexerTool extends IndexTool {
     NLineInputFormat.addInputPath(job, outputStep2Dir);
     NLineInputFormat.setNumLinesPerSplit(job, numLinesPerSplit);
 
-    LOG.info("Indexing {} files using {} real mappers into {} reducers", new Object[]{numFiles, realMappers, reducers});
+    LOG.info("Indexing {} files using {} real mappers into {} reducers", numFiles, realMappers, reducers);
     
     String mapperClass = job.getConfiguration().get(JobContext.MAP_CLASS_ATTR);
     if (mapperClass == null) { // enable customization

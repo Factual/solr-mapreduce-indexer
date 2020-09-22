@@ -22,7 +22,7 @@ import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.Reducer.Context;
-import org.apache.solr.common.SolrInputDocument;
+import org.shaded.apache.solr.common.SolrInputDocument;
 
 /**
  * Interface that enables deduplication and ordering of a series of document

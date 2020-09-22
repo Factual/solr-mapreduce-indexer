@@ -20,7 +20,7 @@ import java.util.Iterator;
 
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Reducer.Context;
-import org.apache.solr.common.SolrInputDocument;
+import org.shaded.apache.solr.common.SolrInputDocument;
 
 /**
  * UpdateConflictResolver implementation that returns the solr documents in the
