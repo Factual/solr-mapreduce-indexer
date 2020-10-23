@@ -256,13 +256,9 @@ public class TreeMergeOutputFormat extends FileOutputFormat<Text, NullWritable> 
     private void writeShardNumberFile(TaskAttemptContext context) throws IOException {
       LOG.info("Writing shard number file");
       Preconditions.checkArgument(shards.size() > 0);
-      String shard = shards.get(0).getParent().getParent().getName(); // move up from "data/index"
-      String taskId = shard.replaceAll("^[^0-9]+", ""); // e.g. part-m-00001 or core2
-      int taskNum = Integer.parseInt(taskId);
-      int outputShardNum = taskNum / shards.size();
-
+      int outputShardNum = context.getTaskAttemptID().getTaskID().getId();
       Path shardNumberFile = new Path(workDir.getParent().getParent(), TreeMergeMapper.SOLR_SHARD_NUMBER);
-      LOG.info("Merging into outputShardNum: " + outputShardNum + " from taskId: " + taskId + "at path: " + shardNumberFile);
+      LOG.info(String.format("Merging %d shards in shard %d path: %s", shards.size(), outputShardNum, shardNumberFile));
 
       OutputStream out = shardNumberFile.getFileSystem(context.getConfiguration()).create(shardNumberFile);
       try (Writer writer = new OutputStreamWriter(out, StandardCharsets.UTF_8)) {
