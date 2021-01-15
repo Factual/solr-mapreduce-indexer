@@ -22,6 +22,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapred.JobContext;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.input.NLineInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
@@ -109,8 +110,9 @@ public class IndexMergeTool extends Configured implements Tool {
 
           mergeTreeJob.setMapSpeculativeExecution(false);
           mergeTreeJob.setReduceSpeculativeExecution(false);
-
-          mergeTreeJob.setJarByClass(getClass());
+          if (conf.get(JobContext.JAR) == null) {
+            mergeTreeJob.setJarByClass(getClass());
+          }
           mergeTreeJob.setJobName("solr-merge | " + options.inputDir + " -> " + options.outputDir);
           mergeTreeJob.setMapperClass(TreeMergeMapper.class);
           mergeTreeJob.setOutputFormatClass(TreeMergeOutputFormat.class);
