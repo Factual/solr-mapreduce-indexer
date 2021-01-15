@@ -112,6 +112,8 @@ public class IndexMergeTool extends Configured implements Tool {
           mergeTreeJob.setReduceSpeculativeExecution(false);
           if (conf.get(JobContext.JAR) == null) {
             mergeTreeJob.setJarByClass(getClass());
+          } else {
+            mergeTreeJob.addFileToClassPath(new Path(conf.get(JobContext.JAR)));
           }
           mergeTreeJob.setJobName("solr-merge | " + options.inputDir + " -> " + options.outputDir);
           mergeTreeJob.setMapperClass(TreeMergeMapper.class);
