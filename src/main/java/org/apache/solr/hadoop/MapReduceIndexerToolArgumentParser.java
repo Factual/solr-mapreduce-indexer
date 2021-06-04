@@ -12,7 +12,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.solr.hadoop.dedup.RetainMostRecentUpdateConflictResolver;
 import org.apache.solr.hadoop.morphline.MorphlineMapRunner;
-import org.apache.solr.hadoop.util.PathArgumentType;
+import com.factual.solr.hadoop.util.PathArgumentType;
 import org.apache.solr.hadoop.util.ToolRunnerHelpFormatter;
 import org.apache.solr.hadoop.util.Utils;
 import org.kitesdk.morphline.base.Fields;

@@ -6,10 +6,8 @@ import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.solr.hadoop.GoLiveToolArgumentParser.GoLiveOptions;
-import org.apache.solr.hadoop.util.PathArgumentType;
+import com.factual.solr.hadoop.util.PathArgumentType;
 import org.apache.solr.hadoop.util.ToolRunnerHelpFormatter;
-import org.apache.solr.hadoop.util.ZooKeeperInspector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

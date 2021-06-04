@@ -30,7 +30,7 @@ import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.lib.input.NLineInputFormat;
-import org.shaded.apache.solr.common.cloud.SolrZkClient;
+import org.apache.solr.common.cloud.SolrZkClient;
 import org.apache.solr.hadoop.MapReduceIndexerToolArgumentParser.Options;
 import org.apache.solr.hadoop.morphline.MorphlineMapRunner;
 import org.apache.solr.hadoop.morphline.MorphlineMapper;

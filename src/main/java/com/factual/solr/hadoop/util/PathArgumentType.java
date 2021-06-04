@@ -14,10 +14,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.solr.hadoop.util;
+package com.factual.solr.hadoop.util;
 
 import java.io.IOException;
 
+import lombok.extern.slf4j.Slf4j;
 import net.sourceforge.argparse4j.inf.Argument;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
@@ -31,6 +32,7 @@ import org.apache.hadoop.fs.permission.FsAction;
 /**
  * ArgumentType subclass for HDFS Path type, using fluent style API.
  */
+@Slf4j
 public class PathArgumentType implements ArgumentType<Path> {
   
   private final Configuration conf;
@@ -178,7 +180,7 @@ public class PathArgumentType implements ArgumentType<Path> {
     if (!fs.isDirectory(file)) {
       throw new ArgumentParserException("Not a directory: " + file, parser);
     }
-  }    
+  }
   
   private void verifyCanRead(ArgumentParser parser, Path file) throws ArgumentParserException, IOException {
     verifyExists(parser, file);
@@ -196,8 +198,12 @@ public class PathArgumentType implements ArgumentType<Path> {
   
   private void verifyCanWriteParent(ArgumentParser parser, Path file) throws ArgumentParserException, IOException {
     Path parent = file.getParent();
+    log.info("parent: " + file);
+    if (file.toUri().getScheme().equals("s3")) {
+      return;
+    }
     if (parent == null || !fs.exists(parent) || !fs.getFileStatus(parent).getPermission().getUserAction().implies(FsAction.WRITE)) {
-      throw new ArgumentParserException("Cannot write parent of file: " + file, parser);
+      throw new ArgumentParserException("Cannot write parent of file: " + file + " scheme " + file.toUri().getScheme(), parser);
     }
   }    
   

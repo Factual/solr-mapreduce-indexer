@@ -16,7 +16,7 @@
  */
 package org.apache.solr.hadoop;
 
-import org.shaded.apache.solr.client.solrj.embedded.EmbeddedSolrServer;
+import org.apache.solr.client.solrj.embedded.EmbeddedSolrServer;
 import org.apache.solr.hadoop.util.HeartBeater;
 import org.apache.solr.hadoop.util.Utils;
 
@@ -44,18 +44,18 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.shaded.apache.lucene.analysis.core.WhitespaceAnalyzer;
-import org.shaded.apache.lucene.index.IndexWriter;
-import org.shaded.apache.lucene.index.IndexWriterConfig;
-import org.shaded.apache.lucene.index.IndexWriterConfig.OpenMode;
-import org.shaded.apache.lucene.index.LogMergePolicy;
-import org.shaded.apache.lucene.index.MergePolicy;
-import org.shaded.apache.lucene.index.TieredMergePolicy;
-import org.shaded.apache.lucene.misc.IndexMergeTool;
-import org.shaded.apache.lucene.store.Directory;
-import org.shaded.apache.solr.store.hdfs.HdfsDirectory;
-import org.shaded.apache.solr.update.SolrIndexWriter;
-import org.shaded.apache.solr.util.RTimer;
+import org.apache.lucene.analysis.core.WhitespaceAnalyzer;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.IndexWriterConfig.OpenMode;
+import org.apache.lucene.index.LogMergePolicy;
+import org.apache.lucene.index.MergePolicy;
+import org.apache.lucene.index.TieredMergePolicy;
+import org.apache.lucene.misc.IndexMergeTool;
+import org.apache.lucene.store.Directory;
+import org.apache.solr.store.hdfs.HdfsDirectory;
+import org.apache.solr.update.SolrIndexWriter;
+import org.apache.solr.util.RTimer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

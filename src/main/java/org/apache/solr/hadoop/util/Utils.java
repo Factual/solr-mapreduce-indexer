@@ -48,7 +48,7 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.input.NLineInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
-import org.shaded.apache.solr.common.util.SuppressForbidden;
+import org.apache.solr.common.util.SuppressForbidden;
 import org.apache.solr.hadoop.MapReduceIndexerTool;
 import org.apache.solr.hadoop.MorphlineEnabledIndexerTool;
 

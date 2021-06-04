@@ -16,9 +16,33 @@
  */
 package org.apache.solr.hadoop;
 
-import org.apache.hadoop.fs.*;
-import org.apache.hadoop.mapreduce.*;
+import com.google.common.collect.ImmutableMap;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.filecache.DistributedCache;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocalFileSystem;
+import org.apache.hadoop.fs.LocatedFileStatus;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.mapreduce.MRJobConfig;
+import org.apache.hadoop.mapreduce.RecordWriter;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.TaskAttemptContext;
+import org.apache.hadoop.mapreduce.TaskID;
+import org.apache.solr.client.solrj.SolrServerException;
+import org.apache.solr.client.solrj.embedded.EmbeddedSolrServer;
+import org.apache.solr.common.SolrException;
+import org.apache.solr.common.SolrInputDocument;
+import org.apache.solr.core.CoreContainer;
+import org.apache.solr.core.CoreDescriptor;
+import org.apache.solr.core.CorePropertiesLocator;
+import org.apache.solr.core.DirectoryFactory;
+import org.apache.solr.core.HdfsDirectoryFactory;
+import org.apache.solr.core.SolrCore;
 import org.apache.solr.hadoop.util.HeartBeater;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.nio.file.Paths;
@@ -31,17 +55,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-
-import com.google.common.collect.ImmutableMap;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.filecache.DistributedCache;
-import org.shaded.apache.solr.client.solrj.SolrServerException;
-import org.shaded.apache.solr.client.solrj.embedded.EmbeddedSolrServer;
-import org.shaded.apache.solr.common.SolrException;
-import org.shaded.apache.solr.common.SolrInputDocument;
-import org.shaded.apache.solr.core.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
 
@@ -142,14 +155,6 @@ public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
     
     String dataDirStr = solrDataDir.toUri().toString();
 
-    SolrResourceLoader loader = new SolrResourceLoader(Paths.get(solrHomeDir.toString()), null, null);
-
-    LOG.info(String
-            .format(Locale.ENGLISH,
-                    "Constructed instance information solr.home %s (%s), instance dir %s, conf dir %s, writing index to solr.data.dir %s, with permdir %s",
-                    solrHomeDir, solrHomeDir.toUri(), loader.getInstancePath(),
-                    loader.getConfigDir(), dataDirStr, outputShardDir));
-
     // TODO: This is fragile and should be well documented
     System.setProperty("solr.directoryFactory", HdfsDirectoryFactory.class.getName());
     System.setProperty("solr.lock.type", DirectoryFactory.LOCK_TYPE_HDFS);
@@ -159,7 +164,11 @@ public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
     System.setProperty("solr.autoCommit.maxTime", "600000");
     System.setProperty("solr.autoSoftCommit.maxTime", "-1");
 
-    CoreContainer container = new CoreContainer(loader);
+    CoreContainer container = new CoreContainer(Paths.get(solrHomeDir.toString()), null);
+    LOG.info("Constructed instance information solr.home {} ({}), instance dir {}, conf dir {}, writing index to solr.data.dir {}, with permdir {}",
+            solrHomeDir, solrHomeDir.toUri(), container.getResourceLoader().getInstancePath(),
+            container.getResourceLoader().getConfigDir(), dataDirStr, outputShardDir);
+
     container.load();
     SolrCore core;
     core = container.create(DEFAULT_CORE_NAME, ImmutableMap.of(CoreDescriptor.CORE_DATADIR, dataDirStr));
