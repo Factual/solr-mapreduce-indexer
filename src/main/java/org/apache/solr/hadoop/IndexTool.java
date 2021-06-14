@@ -74,8 +74,6 @@ public abstract class IndexTool extends Configured implements Tool {
    * eventually
    */
   public int run(MapReduceIndexerToolArgumentParser.Options options) throws Exception {
-
-    LOG.info("running: " + options);
     Instant programStart = Instant.now();
     
     if (options.fairSchedulerPool != null) {
@@ -87,12 +85,9 @@ public abstract class IndexTool extends Configured implements Tool {
       Utils.setLogConfigFile(options.log4jConfigFile, getConf());
       addDistributedCacheFile(options.log4jConfigFile, getConf());
     }
-    LOG.info("conf: " + getConf());
 
     Job job = Job.getInstance(getConf());
     job.setJarByClass(getClass());
-    LOG.info("class: " + getClass());
-    LOG.info("jar: " + job.getJar());
 
     options.zkOptions.verifyZKStructure(null);
     // auto update shard count
