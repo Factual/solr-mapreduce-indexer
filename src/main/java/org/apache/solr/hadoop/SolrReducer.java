@@ -16,6 +16,7 @@
  */
 package org.apache.solr.hadoop;
 
+import org.apache.hadoop.fs.Path;
 import org.apache.solr.hadoop.util.HeartBeater;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;

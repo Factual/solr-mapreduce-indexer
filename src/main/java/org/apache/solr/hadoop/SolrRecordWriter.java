@@ -137,7 +137,7 @@ public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
 
       Path outputSolrHomeDir = new Path(outputShardDir, SOLR_HOME_DIR);
       fs.copyFromLocalFile(new Path(solr.getCoreContainer().getSolrHome()), outputSolrHomeDir);
-
+      SolrRecordWriter.removeCoreProperties(outputSolrHomeDir, fs);
     } finally {
       heartBeater.cancelHeartBeat();
     }
@@ -185,9 +185,13 @@ public class SolrRecordWriter<K, V> extends RecordWriter<K, V> {
   public static void removeLocalCoreProperties(Configuration conf, Path solrHomeDir) throws IOException {
     // clean up core.properties so CoreContainer can load it
     LocalFileSystem lfs = FileSystem.getLocal(conf);
+    removeCoreProperties(solrHomeDir, lfs);
+  }
+
+  public static void removeCoreProperties(Path solrHomeDir, FileSystem fs) throws IOException {
     Path coreProperties = new Path(new Path(solrHomeDir, DEFAULT_CORE_NAME), CorePropertiesLocator.PROPERTIES_FILENAME);
-    if (lfs.delete(coreProperties, false)) {
-      LOG.info("deleted {}", CorePropertiesLocator.PROPERTIES_FILENAME);
+    if (fs.delete(coreProperties, false)) {
+      LOG.info("deleted {}", coreProperties);
     }
   }
 
